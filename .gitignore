@@ -1,0 +1,25 @@
+# .NET build output
+bin/
+obj/
+
+# SQLite database (contains MP3 blobs, way too large for git)
+PIGv4-data/*.db
+PIGv4-data/*.db-shm
+PIGv4-data/*.db-wal
+
+# User-specific files
+*.user
+*.suo
+*.userprefs
+
+# IDE
+.vs/
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temp files
+*.tmp
+*.swp

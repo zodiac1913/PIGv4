@@ -1,0 +1,174 @@
+html {
+  font-size: 14px;
+}
+
+@media (min-width: 768px) {
+  html {
+    font-size: 16px;
+  }
+}
+
+.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
+  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
+}
+
+html {
+  position: relative;
+  min-height: 100%;
+}
+
+body {
+  background-color: #FFEEEE;
+  /* background-image: linear-gradient(315deg, #FFEEEE 0%, #DDEFBB 74%);
+  background-image: url('/pics/PIGTranBG.png'); 
+  background-size: cover;
+  background-size: 32% 45%; 
+  background-repeat: no-repeat; 
+  background-attachment: fixed; 
+  background-position: right bottom;   */
+}
+
+.form-floating > .form-control-plaintext::placeholder, .form-floating > .form-control::placeholder {
+  color: var(--bs-secondary-color);
+  text-align: end;
+}
+
+.form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
+  text-align: start;
+}
+
+.navpig-link {
+    color: hotpink;
+    text-decoration: none;
+}
+
+.navpig-link:hover {
+    color: lawngreen;
+    text-decoration: underline;
+}
+
+/* Player Sidebar */
+.player-sidebar {
+    position: fixed;
+    top: 56px;
+    right: -320px;
+    width: 320px;
+    height: calc(100vh - 56px);
+    background-color: #1a1a2e;
+    border-left: 2px solid Maroon;
+    z-index: 1040;
+    overflow-y: auto;
+    transition: right 0.3s ease;
+}
+
+.player-sidebar.open {
+    right: 0;
+}
+
+body.sidebar-open .container {
+    margin-right: 320px;
+    transition: margin-right 0.3s ease;
+}
+
+.filter-check-list {
+    max-height: 150px;
+    overflow-y: auto;
+    padding-left: 4px;
+}
+
+.filter-check-list label {
+    display: block;
+    font-size: 0.78rem;
+    color: #bbb;
+    cursor: pointer;
+    padding: 1px 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.filter-check-list label:hover {
+    color: HotPink;
+}
+
+.filter-check-list input[type="checkbox"] {
+    margin-right: 4px;
+    accent-color: HotPink;
+}
+
+.song-list {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.song-list-item {
+    padding: 4px 6px;
+    border-bottom: 1px solid #2a2a3e;
+    cursor: pointer;
+    color: #ccc;
+    font-size: 0.8rem;
+}
+
+.song-list-item:hover {
+    background-color: #2a2a3e;
+    color: HotPink;
+}
+
+.song-list-item.active {
+    background-color: Maroon;
+    color: HotPink;
+}
+
+.song-list-item .song-title {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.song-list-item .song-artist {
+    font-size: 0.7rem;
+    color: #888;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Seek bar styling */
+#seekBar::-webkit-slider-thumb {
+    background: HotPink;
+}
+
+#seekBar::-webkit-slider-runnable-track {
+    background: #444;
+}
+
+/* Transport button group border */
+.transport-controls {
+    display: inline-block;
+    border: 2px solid goldenrod;
+    border-radius: 20px;
+    padding: 2px 6px;
+}
+
+.transport-controls-wrap {
+    border: 2px solid goldenrod;
+    border-radius: 16px;
+    padding: 8px;
+}
+
+/* Make checkboxes visible */
+.form-check-input {
+    border: 2px solid #333;
+}
+
+.form-check-input:checked {
+    border-color: firebrick;
+    background-color: HotPink;
+}
+
+/* Active nav link - keep visible on dark navbar */
+.navpig-link:focus,
+.navpig-link:active,
+.navpig-link.active {
+    color: lawngreen;
+}

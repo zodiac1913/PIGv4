@@ -1,0 +1,147 @@
+@{
+    ViewData["Title"] = "Export";
+}
+<nav class="navbar navbar-expand-sm border-bottom box-shadow rounded-4" style="background-color: Maroon">
+    <div class="container-fluid">
+        <div class="navbar-brand" style="color: HotPink;">Export</div>
+    </div>
+</nav>
+
+<div class="mt-3">
+    <!-- Unfoldered songs alert -->
+    <div id="unfolderedAlert" class="alert alert-warning" style="display:none;">
+        <strong><i class="bi bi-exclamation-triangle"></i> <span id="unfolderedCount">0</span> songs have no folder assigned.</strong>
+        <button class="btn btn-sm btn-outline-dark ms-2" data-bs-toggle="collapse" data-bs-target="#unfolderedPanel">Show &amp; Fix</button>
+        <div class="collapse mt-2" id="unfolderedPanel">
+            <div class="input-group input-group-sm mb-2" style="max-width:400px;">
+                <input type="text" id="assignFolderName" class="form-control" placeholder="Folder name..." />
+                <button class="btn btn-warning" onclick="exportPage.assignFolder()">Assign All</button>
+            </div>
+            <div id="unfolderedList" style="max-height:200px; overflow-y:auto;"></div>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header" style="background-color:Maroon; color:HotPink;"><i class="bi bi-archive"></i> Full Export</div>
+                <div class="card-body">
+                    <p class="small text-muted">All songs by folder + Gen Playlist .m3u files.</p>
+                    <p class="small"><span id="totalSongs">0</span> songs</p>
+                    <button class="btn btn-success" onclick="exportPage.startExport('/Export/ExportAll', 'Full Export')"><i class="bi bi-download"></i> Export All</button>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header" style="background-color:Maroon; color:HotPink;"><i class="bi bi-collection-play"></i> Gen Playlists (.m3u)</div>
+                <div class="card-body">
+                    <p class="small text-muted">All Gen Playlist .m3u files.</p>
+                    <p class="small"><span id="playlistCount">0</span> playlists</p>
+                    <button class="btn btn-success" onclick="exportPage.startExport('/Export/ExportPlaylists', 'Playlists')"><i class="bi bi-download"></i> Export Playlists</button>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header" style="background-color:Maroon; color:HotPink;"><i class="bi bi-folder"></i> Export by Folder</div>
+                <div class="card-body">
+                    <select id="exportFolder" class="form-select form-select-sm mb-2"></select>
+                    <button class="btn btn-success btn-sm" onclick="exportPage.exportByFolder()"><i class="bi bi-download"></i> Export</button>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header" style="background-color:Maroon; color:HotPink;"><i class="bi bi-music-note"></i> Export by Genre</div>
+                <div class="card-body">
+                    <select id="exportGenre" class="form-select form-select-sm mb-2"></select>
+                    <button class="btn btn-success btn-sm" onclick="exportPage.exportByGenre()"><i class="bi bi-download"></i> Export</button>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header" style="background-color:Maroon; color:HotPink;"><i class="bi bi-person"></i> Export by Artist</div>
+                <div class="card-body">
+                    <input type="text" id="exportArtistSearch" class="form-control form-control-sm mb-1" placeholder="Search artist..." oninput="exportPage.filterArtists()" />
+                    <select id="exportArtist" class="form-select form-select-sm mb-2" size="4"></select>
+                    <button class="btn btn-success btn-sm" onclick="exportPage.exportByArtist()"><i class="bi bi-download"></i> Export</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="exportStatus" class="mt-3"></div>
+</div>
+
+<script>
+const exportPage = {
+    _allArtists: [],
+    _unfolderedIds: [],
+
+    async init() {
+        var resp = await fetch('/Export/Options');
+        var data = await resp.json();
+        document.getElementById('totalSongs').textContent = data.totalSongs;
+        document.getElementById('playlistCount').textContent = data.playlistCount;
+
+        var fs = document.getElementById('exportFolder');
+        fs.innerHTML = '<option value="">Select folder...</option>';
+        data.folders.forEach(f => { var o = document.createElement('option'); o.value = f; o.textContent = f; fs.appendChild(o); });
+
+        var gs = document.getElementById('exportGenre');
+        gs.innerHTML = '<option value="">Select genre...</option>';
+        data.genres.forEach(g => { var o = document.createElement('option'); o.value = g; o.textContent = g; gs.appendChild(o); });
+
+        var aResp = await fetch('/Player/Filters?type=artists');
+        this._allArtists = await aResp.json();
+        this.renderArtists(this._allArtists);
+
+        var uResp = await fetch('/Export/Unfoldered');
+        var unfoldered = await uResp.json();
+        if (unfoldered.length > 0) {
+            document.getElementById('unfolderedAlert').style.display = 'block';
+            document.getElementById('unfolderedCount').textContent = unfoldered.length;
+            var list = document.getElementById('unfolderedList');
+            list.innerHTML = '<table class="table table-sm table-striped mb-0"><tbody>'
+                + unfoldered.map(s => '<tr><td>' + this.esc(s.artist) + '</td><td>' + this.esc(s.title) + '</td></tr>').join('')
+                + '</tbody></table>';
+            this._unfolderedIds = unfoldered.map(s => s.pieceId);
+        }
+    },
+
+    renderArtists(artists) {
+        var sel = document.getElementById('exportArtist');
+        sel.innerHTML = '';
+        artists.forEach(a => { var o = document.createElement('option'); o.value = a; o.textContent = a; sel.appendChild(o); });
+    },
+    filterArtists() {
+        var t = document.getElementById('exportArtistSearch').value.toLowerCase();
+        this.renderArtists(this._allArtists.filter(a => a.toLowerCase().indexOf(t) >= 0));
+    },
+    async assignFolder() {
+        var folder = document.getElementById('assignFolderName').value.trim();
+        if (!folder) { alert('Enter a folder name.'); return; }
+        var r = await fetch('/Export/AssignFolder', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({PieceIds:this._unfolderedIds,Folder:folder}) });
+        if (r.ok) { document.getElementById('unfolderedAlert').style.display='none'; this.showStatus('Assigned!','success'); }
+    },
+    startExport(url, label) {
+        var ind = document.getElementById('backupIndicator');
+        if (ind) ind.style.setProperty('display','flex','important');
+        var iframe = document.createElement('iframe'); iframe.style.display='none'; iframe.src=url; document.body.appendChild(iframe);
+        this.showStatus('<span class="spinner-border spinner-border-sm"></span> '+label+' in progress... <button class="btn btn-sm btn-outline-success ms-2" onclick="exportPage.exportDone()">Done</button>','info');
+    },
+    exportDone() {
+        var ind = document.getElementById('backupIndicator');
+        if (ind) ind.style.setProperty('display','none','important');
+        this.showStatus('Export complete.','success');
+    },
+    exportByFolder() { var v=document.getElementById('exportFolder').value; if(!v){alert('Select a folder.');return;} this.startExport('/Export/ExportFolder?folder='+encodeURIComponent(v),'Folder: '+v); },
+    exportByGenre() { var v=document.getElementById('exportGenre').value; if(!v){alert('Select a genre.');return;} this.startExport('/Export/ExportGenre?genre='+encodeURIComponent(v),'Genre: '+v); },
+    exportByArtist() { var v=document.getElementById('exportArtist').value; if(!v){alert('Select an artist.');return;} this.startExport('/Export/ExportArtist?artist='+encodeURIComponent(v),'Artist: '+v); },
+    showStatus(html,type) { var el=document.getElementById('exportStatus'); el.className='mt-3 alert alert-'+type; el.innerHTML=html; },
+    esc(v) { return (v||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+};
+document.addEventListener('DOMContentLoaded', () => exportPage.init());
+if (document.readyState !== 'loading') exportPage.init();
+</script>

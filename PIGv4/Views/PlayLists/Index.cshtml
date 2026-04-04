@@ -1,0 +1,63 @@
+@{
+    ViewData["Title"] = "Gen Playlists";
+}
+<nav class="navbar navbar-expand-sm border-bottom box-shadow rounded-4" style="background-color: Maroon">
+    <div class="container-fluid">
+        <div class="navbar-brand" style="color: HotPink;">Gen Playlists</div>
+    </div>
+</nav>
+
+<!-- PLAYLIST LIST VIEW -->
+<div id="plListView" class="mt-2">
+    <div class="row mb-2">
+        <div class="col-md-4">
+            <div class="input-group input-group-sm">
+                <span class="input-group-text"><i class="bi bi-search"></i></span>
+                <input type="text" id="plSearch" class="form-control" placeholder="Search playlists..." oninput="plPage.debounceSearch()" />
+            </div>
+        </div>
+        <div class="col-md-8 text-end">
+            <small class="text-muted"><span id="plCount">0</span> playlists</small>
+        </div>
+    </div>
+    <div class="table-responsive" style="max-height: 70vh; overflow-y: auto;">
+        <table class="table table-sm table-striped table-hover align-middle mb-0">
+            <thead class="sticky-top table-dark">
+                <tr><th>Playlist</th><th>Songs</th><th>Min</th><th></th></tr>
+            </thead>
+            <tbody id="plTableBody"></tbody>
+        </table>
+    </div>
+    <div id="plPager" class="text-center mt-2 mb-5 pb-5" style="position:relative; z-index:10;"></div>
+</div>
+
+<!-- PLAYLIST DETAIL VIEW -->
+<div id="plDetailView" style="display:none;" class="mt-2">
+    <button class="btn btn-outline-secondary btn-sm mb-2" onclick="plPage.backToList()">
+        <i class="bi bi-arrow-left"></i> Back to List
+    </button>
+    <h5 id="plDetailTitle" style="color: Maroon;"></h5>
+    <div class="input-group input-group-sm mb-2" style="max-width:300px;">
+        <span class="input-group-text"><i class="bi bi-search"></i></span>
+        <input type="text" id="plSongSearch" class="form-control" placeholder="Search songs in playlist..." oninput="plPage.filterDetailSongs(this.value)" />
+    </div>
+    <div class="table-responsive" style="max-height: 60vh; overflow-y: auto;">
+        <table class="table table-sm table-striped table-hover align-middle mb-0">
+            <thead class="sticky-top table-dark">
+                <tr>
+                    <th>Artist</th><th>Title</th><th>Album</th><th>Genre</th>
+                    <th class="text-center">By Title</th>
+                    <th class="text-center">By Artist</th>
+                    <th></th><th></th>
+                </tr>
+            </thead>
+            <tbody id="plSongBody"></tbody>
+        </table>
+    </div>
+</div>
+
+<!-- SONG DETAIL FROM PLAYLIST (uses shared module) -->
+<div id="plSongDetailView" style="display:none;" class="mt-2"></div>
+
+<script src="/js/playlists.js?v=1"></script>
+<script>if (typeof plPage !== 'undefined') plPage.init();</script>

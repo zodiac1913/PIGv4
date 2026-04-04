@@ -1,0 +1,73 @@
+@{
+    ViewData["Title"] = "Songs";
+}
+<nav class="navbar navbar-expand-sm border-bottom box-shadow rounded-4" style="background-color: Maroon">
+    <div class="container-fluid">
+        <div class="navbar-brand" style="color: HotPink;">Songs</div>
+    </div>
+</nav>
+
+<!-- SONG LIST VIEW -->
+<div id="songListView" class="mt-2">
+    <div class="row mb-2">
+        <div class="col-md-4">
+            <div class="input-group input-group-sm">
+                <span class="input-group-text"><i class="bi bi-search"></i></span>
+                <input type="text" id="songSearch" class="form-control" placeholder="Search artist, title, album..." oninput="songPage.debounceSearch()" />
+            </div>
+        </div>
+        <div class="col-md-2">
+            <select id="folderFilter" class="form-select form-select-sm" onchange="songPage.browse()">
+                <option value="">All Folders</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <div class="form-check form-switch mt-1">
+                <input class="form-check-input" type="checkbox" id="newOnlyFilter" onchange="songPage.browse()">
+                <label class="form-check-label small" for="newOnlyFilter">New Only</label>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <select id="pageSizeSelect" class="form-select form-select-sm" onchange="songPage.setPageSize(this.value)">
+                <option value="10">10 per page</option>
+                <option value="50" selected>50 per page</option>
+                <option value="100">100 per page</option>
+                <option value="500">500 per page</option>
+            </select>
+        </div>
+        <div class="col-md-2 text-end">
+            <small class="text-muted"><span id="songCount">0</span> songs</small>
+        </div>
+    </div>
+    <!-- Alpha skip -->
+    <div id="alphaSkip" class="mb-2"></div>
+    <!-- Song table -->
+    <div class="table-responsive" style="max-height: 70vh; overflow-y: auto;">
+        <table class="table table-sm table-striped table-hover align-middle mb-0">
+            <thead class="sticky-top table-dark">
+                <tr>
+                    <th></th>
+                    <th>Artist</th>
+                    <th>Title</th>
+                    <th>Album</th>
+                    <th>Genre</th>
+                    <th>Year</th>
+                    <th>BPM</th>
+                    <th>Dur</th>
+                    <th>Folder</th>
+                </tr>
+            </thead>
+            <tbody id="songTableBody"></tbody>
+        </table>
+    </div>
+    <!-- Pager -->
+    <div id="songPager" class="text-center mt-2 mb-5 pb-5" style="position:relative; z-index:10;"></div>
+</div>
+
+<!-- SONG DETAIL VIEW (uses shared module) -->
+<div id="songDetailView" style="display:none;" class="mt-2"></div>
+
+<script src="/js/songs.js?v=2"></script>
+<script>
+    if (typeof songPage !== 'undefined') songPage.init();
+</script>

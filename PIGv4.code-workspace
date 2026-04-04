@@ -1,0 +1,30 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"workbench.colorCustomizations": {
+			"activityBar.activeBackground": "#f0b9a6",
+			"activityBar.background": "#f0b9a6",
+			"activityBar.foreground": "#15202b",
+			"activityBar.inactiveForeground": "#15202b99",
+			"activityBarBadge.background": "#178834",
+			"activityBarBadge.foreground": "#e7e7e7",
+			"commandCenter.border": "#15202b99",
+			"sash.hoverBorder": "#f0b9a6",
+			"statusBar.background": "#e9967a",
+			"statusBar.foreground": "#15202b",
+			"statusBarItem.hoverBackground": "#e2734e",
+			"statusBarItem.remoteBackground": "#e9967a",
+			"statusBarItem.remoteForeground": "#15202b",
+			"titleBar.activeBackground": "#e9967a",
+			"titleBar.activeForeground": "#15202b",
+			"titleBar.inactiveBackground": "#e9967a99",
+			"titleBar.inactiveForeground": "#15202b99"
+		},
+		"peacock.color": "DarkSalmon",
+		"kiroAgent.configureMCP": "Disabled"
+	}
+}

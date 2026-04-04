@@ -1,0 +1,394 @@
+@{
+    ViewData["Title"] = "Playlist Intelligent Generator v4.0";
+}
+<nav class="navbar navbar-expand-sm navbar-toggleable-sm border-bottom box-shadow rounded-4" style="background-color: Maroon">
+    <div class="container-fluid">
+        <div class="navbar-brand" style="color: HotPink;">Import / Export</div>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse"
+                aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
+            <ul class="navbar-nav flex-grow-1">
+                <li class="nav-item">
+                    <a class="nav-link text-warning" href="#" title="Import Songs"
+                       data-bs-toggle="modal" data-bs-target="#importModal">Import</a>
+                </li>
+            </ul>
+        </div>
+    </div>
+</nav>
+
+<!-- Import Modal -->
+<div class="modal fade" id="importModal" tabindex="-1" aria-labelledby="importModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content bg-dark text-light">
+            <div class="modal-header" style="background-color: Maroon;">
+                <h5 class="modal-title" id="importModalLabel" style="color: HotPink;">Import Songs</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Source dropdown -->
+                <div class="row mb-3">
+                    <div class="col-md-3">
+                        <label for="importSource" class="form-label">Import Source</label>
+                        <select id="importSource" class="form-select">
+                            <option value="harddrive" selected>From Hard Drive</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Hard Drive import panel -->
+                <div id="hardDrivePanel">
+                    <input type="file" id="folderPicker" webkitdirectory directory multiple
+                           style="display:none;" />
+                    <div class="input-group mb-3">
+                        <input type="text" id="folderPath" class="form-control" readonly
+                               placeholder="Click Browse to select a folder..." />
+                        <button type="button" id="browseBtn" class="btn btn-outline-light">
+                            <i class="bi bi-folder2-open"></i> Browse
+                        </button>
+                        <button type="button" id="scanBtn" class="btn btn-outline-light" style="background-color: Maroon;" disabled>
+                            <i class="bi bi-download"></i> Scan &amp; Import
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Status messages -->
+                <div id="importStatus" class="mb-3" style="display:none;"></div>
+
+                <!-- Progress display -->
+                <div id="importSpinner" class="mb-3" style="display:none;">
+                    <div class="d-flex justify-content-between mb-1">
+                        <small id="importCurrentFile" class="text-info">Preparing...</small>
+                        <small id="importCounter" class="text-muted"></small>
+                    </div>
+                    <div class="progress" style="height: 22px;">
+                        <div id="importProgressBar" class="progress-bar progress-bar-striped progress-bar-animated"
+                             role="progressbar" style="width: 0%; background-color: Maroon;">0%</div>
+                    </div>
+                    <div id="importProgress" class="mt-1 text-muted small"></div>
+                </div>
+
+                <!-- Results table -->
+                <div id="importResults" style="display:none;">
+                    <div class="table-responsive" style="max-height: 60vh; overflow-y: auto;">
+                        <table class="table table-dark table-sm table-striped align-middle mb-0">
+                            <thead class="sticky-top">
+                                <tr>
+                                    <th>File</th>
+                                    <th>Title</th>
+                                    <th>Artist</th>
+                                    <th>Album</th>
+                                    <th>Genre</th>
+                                    <th>Year</th>
+                                    <th>BPM</th>
+                                    <th>Track</th>
+                                    <th>Duration</th>
+                                    <th>Comment</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="songTableBody"></tbody>
+                        </table>
+                    </div>
+                    <div class="text-end mt-3">
+                        <button type="button" id="acceptAllBtn" class="btn btn-outline-info me-2" style="display:none;">
+                            <i class="bi bi-check-all"></i> Accept All Suggestions
+                        </button>
+                        <button type="button" id="showLogBtn" class="btn btn-outline-warning me-2" style="display:none;">
+                            <i class="bi bi-journal-text"></i> Import Log
+                        </button>
+                        <button type="button" id="doneBtn" class="btn btn-outline-light" data-bs-dismiss="modal" style="display:none;" onclick="resetImportModal()">
+                            <i class="bi bi-check-circle"></i> Done
+                        </button>
+                    </div>
+                    <!-- Import log (skipped/errors) -->
+                    <div id="importLog" class="mt-3" style="display:none;">
+                        <h6 class="text-warning">Import Log</h6>
+                        <div class="table-responsive" style="max-height: 30vh; overflow-y: auto;">
+                            <table class="table table-dark table-sm table-striped mb-0">
+                                <thead class="sticky-top">
+                                    <tr><th>File</th><th>Status</th><th>Reason</th></tr>
+                                </thead>
+                                <tbody id="logTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    const folderPicker = document.getElementById('folderPicker');
+    const folderPathInput = document.getElementById('folderPath');
+    const scanBtn = document.getElementById('scanBtn');
+    let selectedFiles = [];
+
+    document.getElementById('browseBtn').addEventListener('click', () => folderPicker.click());
+
+    folderPicker.addEventListener('change', function () {
+        selectedFiles = Array.from(this.files).filter(f => f.name.toLowerCase().endsWith('.mp3'));
+        if (selectedFiles.length === 0) {
+            showStatus('No MP3 files found in the selected folder.', 'warning');
+            folderPathInput.value = '';
+            scanBtn.disabled = true;
+            return;
+        }
+        folderPathInput.value = selectedFiles.length + ' MP3 file(s) selected';
+        scanBtn.disabled = false;
+        document.getElementById('importStatus').style.display = 'none';
+    });
+
+    scanBtn.addEventListener('click', async function () {
+        if (selectedFiles.length === 0) { showStatus('Please select a folder first.', 'warning'); return; }
+
+        const sorted = selectedFiles.slice().sort((a, b) => a.name.localeCompare(b.name));
+        const total = sorted.length;
+        let importedCount = 0;
+        let skippedCount = 0;
+        let errorCount = 0;
+        const logEntries = [];
+
+        scanBtn.disabled = true;
+        document.getElementById('browseBtn').disabled = true;
+        document.getElementById('importSpinner').style.display = 'block';
+        document.getElementById('importResults').style.display = 'block';
+        document.getElementById('importStatus').style.display = 'none';
+        document.getElementById('importLog').style.display = 'none';
+        document.getElementById('songTableBody').innerHTML = '';
+        document.getElementById('logTableBody').innerHTML = '';
+
+        const progressBar = document.getElementById('importProgressBar');
+        progressBar.classList.add('progress-bar-animated');
+        const currentFileEl = document.getElementById('importCurrentFile');
+        const counterEl = document.getElementById('importCounter');
+        const progressEl = document.getElementById('importProgress');
+
+        for (let i = 0; i < total; i++) {
+            const file = sorted[i];
+            const pct = Math.round(((i) / total) * 100);
+            progressBar.style.width = pct + '%';
+            progressBar.textContent = pct + '%';
+            currentFileEl.textContent = file.name;
+            counterEl.textContent = (i + 1) + ' of ' + total;
+            progressEl.textContent = 'Reading tags, fingerprinting, checking MusicBrainz...';
+
+            // Extract the top-level folder from the relative path
+            const relPath = file.webkitRelativePath || '';
+            const parts = relPath.split('/');
+            const sourceFolder = parts.length > 1 ? parts[0] : '';
+
+            try {
+                const formData = new FormData();
+                formData.append('files', file);
+                formData.append('sourceFolder', sourceFolder);
+
+                const resp = await fetch('@Url.Action("ImportFromFiles", "Impex")', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await resp.json();
+
+                if (data.status === 'imported') {
+                    importedCount++;
+                    appendSongRow(data.song);
+                    logEntries.push({ file: file.name, status: 'Imported', reason: '' });
+                } else if (data.status === 'skipped') {
+                    skippedCount++;
+                    logEntries.push({ file: file.name, status: 'Skipped', reason: data.reason });
+                } else {
+                    errorCount++;
+                    logEntries.push({ file: file.name, status: 'Error', reason: data.reason || 'Unknown error' });
+                }
+            } catch (err) {
+                errorCount++;
+                logEntries.push({ file: file.name, status: 'Error', reason: err.message });
+            }
+        }
+
+        // Done
+        progressBar.style.width = '100%';
+        progressBar.textContent = '100%';
+        progressBar.classList.remove('progress-bar-animated');
+        currentFileEl.textContent = 'Complete';
+        counterEl.textContent = '';
+        progressEl.textContent = '';
+
+        let msg = 'Imported ' + importedCount + ' song(s).';
+        if (skippedCount > 0) msg += ' ' + skippedCount + ' skipped (duplicate).';
+        if (errorCount > 0) msg += ' ' + errorCount + ' error(s).';
+        showStatus(msg, importedCount > 0 ? 'success' : 'info');
+
+        // Populate import log
+        const logBody = document.getElementById('logTableBody');
+        logEntries.forEach(e => {
+            const cls = e.status === 'Imported' ? 'text-success' : (e.status === 'Skipped' ? 'text-warning' : 'text-danger');
+            const tr = document.createElement('tr');
+            tr.innerHTML = '<td>' + esc(e.file) + '</td><td class="' + cls + '">' + e.status + '</td><td class="small">' + esc(e.reason) + '</td>';
+            logBody.appendChild(tr);
+        });
+
+        // Show log button if there were any skips or errors
+        const showLogBtn = document.getElementById('showLogBtn');
+        if (skippedCount > 0 || errorCount > 0) {
+            showLogBtn.style.display = 'inline-block';
+            showLogBtn.onclick = function () {
+                const logDiv = document.getElementById('importLog');
+                logDiv.style.display = logDiv.style.display === 'none' ? 'block' : 'none';
+            };
+        } else {
+            showLogBtn.style.display = 'none';
+        }
+
+        const hasSuggestions = document.querySelectorAll('.accept-mb').length > 0;
+        document.getElementById('acceptAllBtn').style.display = hasSuggestions ? 'inline-block' : 'none';
+        bindSaveButtons();
+        bindAcceptButtons();
+        bindAcceptAll();
+
+        scanBtn.disabled = false;
+        document.getElementById('browseBtn').disabled = false;
+        document.getElementById('doneBtn').style.display = 'inline-block';
+    });
+
+    function showStatus(msg, type) {
+        const el = document.getElementById('importStatus');
+        el.className = 'mb-3 alert alert-' + type;
+        el.textContent = msg;
+        el.style.display = 'block';
+    }
+
+    function esc(val) {
+        if (val === null || val === undefined) return '';
+        return val.toString().replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    function resetImportModal() {
+        selectedFiles = [];
+        folderPathInput.value = '';
+        scanBtn.disabled = true;
+        document.getElementById('folderPicker').value = '';
+        document.getElementById('importStatus').style.display = 'none';
+        document.getElementById('importSpinner').style.display = 'none';
+        document.getElementById('importResults').style.display = 'none';
+        document.getElementById('importLog').style.display = 'none';
+        document.getElementById('songTableBody').innerHTML = '';
+        document.getElementById('logTableBody').innerHTML = '';
+        document.getElementById('acceptAllBtn').style.display = 'none';
+        document.getElementById('showLogBtn').style.display = 'none';
+        document.getElementById('doneBtn').style.display = 'none';
+        var pb = document.getElementById('importProgressBar');
+        pb.style.width = '0%';
+        pb.textContent = '0%';
+        pb.classList.add('progress-bar-animated');
+    }
+
+    function appendSongRow(s) {
+        const tbody = document.getElementById('songTableBody');
+        const dur = s.seconds ? Math.floor(s.seconds / 60) + ':' + String(s.seconds % 60).padStart(2, '0') : '';
+        const mb = s.mb;
+        const tr = document.createElement('tr');
+        tr.id = 'row-' + s.pieceId;
+        tr.innerHTML =
+            '<td class="text-truncate" style="max-width:150px;" title="' + esc(s.fileName) + '">' + esc(s.fileName) + '</td>' +
+            '<td>' + fieldWithSuggestion('Title', s.title, mb ? mb.title : null) + '</td>' +
+            '<td>' + fieldWithSuggestion('Artist', s.artist, mb ? mb.artist : null) + '</td>' +
+            '<td>' + fieldWithSuggestion('Album', s.album, mb ? mb.album : null) + '</td>' +
+            '<td>' + fieldWithSuggestion('Genre', s.genre, mb ? mb.genre : null) + '</td>' +
+            '<td>' + fieldWithSuggestion('Year', s.year, mb ? mb.year : null, 'number', '80px') + '</td>' +
+            '<td><input type="number" class="form-control form-control-sm" name="BPM" value="' + (s.bpm || '') + '" style="width:70px;"/></td>' +
+            '<td>' + fieldWithSuggestion('Track', s.track, mb ? mb.track : null, 'number', '70px') + '</td>' +
+            '<td class="text-nowrap">' + dur + '</td>' +
+            '<td><input type="text" class="form-control form-control-sm" name="Comment" value="' + esc(s.comment) + '"/></td>' +
+            '<td><button type="button" class="btn btn-sm btn-outline-success save-btn" data-song-id="' + s.pieceId + '"><i class="bi bi-check-lg"></i></button></td>';
+        tbody.appendChild(tr);
+
+        if (mb && mb.score) {
+            const pct = Math.round(mb.score * 100);
+            const badge = tr.querySelector('td:first-child');
+            badge.innerHTML += '<br><span class="badge bg-info" title="MusicBrainz confidence">MB ' + pct + '%</span>';
+        }
+
+        // Scroll to the new row
+        tr.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    function fieldWithSuggestion(name, localVal, mbVal, type, width) {
+        type = type || 'text';
+        const style = width ? ' style="width:' + width + ';"' : '';
+        const inputVal = (localVal !== null && localVal !== undefined) ? esc(localVal) : '';
+        let html = '<input type="' + type + '" class="form-control form-control-sm" name="' + name + '" value="' + inputVal + '"' + style + '/>';
+
+        const localStr = (localVal || '').toString().toLowerCase().trim();
+        const mbStr = (mbVal !== null && mbVal !== undefined) ? mbVal.toString().toLowerCase().trim() : '';
+        if (mbVal !== null && mbVal !== undefined && mbStr !== '' && mbStr !== localStr) {
+            html += '<div class="mt-1">'
+                + '<small class="text-info" title="MusicBrainz suggestion">\u{1F4A1} ' + esc(mbVal) + '</small>'
+                + ' <button type="button" class="btn btn-outline-info btn-sm py-0 px-1 ms-1 accept-mb"'
+                + ' data-field="' + name + '" data-value="' + esc(mbVal) + '">\u2713</button>'
+                + '</div>';
+        }
+        return html;
+    }
+
+    function bindAcceptButtons() {
+        document.querySelectorAll('.accept-mb').forEach(btn => {
+            btn.addEventListener('click', function () {
+                const field = this.dataset.field;
+                const value = this.dataset.value;
+                const row = this.closest('tr');
+                const input = row.querySelector('[name="' + field + '"]');
+                if (input) {
+                    input.value = value;
+                    input.classList.add('border-info');
+                }
+                this.closest('div').remove();
+                if (document.querySelectorAll('.accept-mb').length === 0)
+                    document.getElementById('acceptAllBtn').style.display = 'none';
+            });
+        });
+    }
+
+    function bindAcceptAll() {
+        document.getElementById('acceptAllBtn').addEventListener('click', function () {
+            document.querySelectorAll('.accept-mb').forEach(btn => btn.click());
+            this.style.display = 'none';
+            document.querySelectorAll('.save-btn').forEach(btn => btn.click());
+        });
+    }
+
+    function bindSaveButtons() {
+        document.querySelectorAll('.save-btn').forEach(btn => {
+            btn.addEventListener('click', async function () {
+                const row = document.getElementById('row-' + this.dataset.songId);
+                const payload = {
+                    SongId: parseInt(this.dataset.songId),
+                    Title: row.querySelector('[name="Title"]').value,
+                    Artist: row.querySelector('[name="Artist"]').value,
+                    Album: row.querySelector('[name="Album"]').value,
+                    Genre: row.querySelector('[name="Genre"]').value,
+                    Year: row.querySelector('[name="Year"]').value || null,
+                    BPM: row.querySelector('[name="BPM"]').value || null,
+                    Track: row.querySelector('[name="Track"]').value || null,
+                    Comment: row.querySelector('[name="Comment"]').value
+                };
+                const resp = await fetch('@Url.Action("UpdateSongTags", "Impex")', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (resp.ok) {
+                    btn.classList.replace('btn-outline-success', 'btn-success');
+                    setTimeout(() => btn.classList.replace('btn-success', 'btn-outline-success'), 1500);
+                } else {
+                    btn.classList.add('btn-danger');
+                }
+            });
+        });
+    }
+</script>
+}

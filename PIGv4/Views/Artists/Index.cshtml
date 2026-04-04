@@ -1,0 +1,86 @@
+@{
+    ViewData["Title"] = "Artists";
+}
+<nav class="navbar navbar-expand-sm border-bottom box-shadow rounded-4" style="background-color: Maroon">
+    <div class="container-fluid">
+        <div class="navbar-brand" style="color: HotPink;">Artists</div>
+    </div>
+</nav>
+
+<!-- ARTIST LIST VIEW -->
+<div id="artistListView" class="mt-2">
+    <div class="row mb-2">
+        <div class="col-md-4">
+            <div class="input-group input-group-sm">
+                <span class="input-group-text"><i class="bi bi-search"></i></span>
+                <input type="text" id="artistSearch" class="form-control" placeholder="Search artists..." oninput="artistPage.debounceSearch()" />
+            </div>
+        </div>
+        <div class="col-md-2">
+            <select id="artistPageSize" class="form-select form-select-sm" onchange="artistPage.setPageSize(this.value)">
+                <option value="10">10</option>
+                <option value="50" selected>50</option>
+                <option value="100">100</option>
+                <option value="500">500</option>
+            </select>
+        </div>
+        <div class="col-md-6 text-end">
+            <small class="text-muted"><span id="artistCount">0</span> artists</small>
+        </div>
+    </div>
+    <div id="artistAlpha" class="mb-2"></div>
+    <div class="table-responsive" style="max-height: 65vh; overflow-y: auto;">
+        <table class="table table-sm table-striped table-hover align-middle mb-0">
+            <thead class="sticky-top table-dark">
+                <tr><th>Artist</th><th>Songs</th><th></th></tr>
+            </thead>
+            <tbody id="artistTableBody"></tbody>
+        </table>
+    </div>
+    <div id="artistPager" class="text-center mt-2 mb-5 pb-5" style="position:relative; z-index:10;"></div>
+</div>
+
+<!-- ARTIST DETAIL VIEW -->
+<div id="artistDetailView" style="display:none;" class="mt-2">
+    <button class="btn btn-outline-secondary btn-sm mb-2" onclick="artistPage.backToList()">
+        <i class="bi bi-arrow-left"></i> Back to List
+    </button>
+    <h5 id="detailArtistName" style="color: Maroon;"></h5>
+
+    <!-- Duplicate alert -->
+    <div id="dupAlert" class="alert alert-warning" style="display:none;">
+        <strong><i class="bi bi-exclamation-triangle"></i> Possible duplicates found:</strong>
+        <div id="dupList" class="mt-1"></div>
+        <div class="mt-2">
+            <label class="form-label small">Merge all into:</label>
+            <select id="mergeTarget" class="form-select form-select-sm d-inline-block" style="width:auto;"></select>
+            <button class="btn btn-sm btn-warning ms-2" onclick="artistPage.merge()"><i class="bi bi-arrow-repeat"></i> Merge</button>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-8">
+            <h6>Songs (<span id="detailSongCount">0</span>)</h6>
+            <div class="table-responsive" style="max-height: 45vh; overflow-y: auto;">
+                <table class="table table-sm table-striped table-hover mb-0">
+                    <thead class="sticky-top table-dark">
+                        <tr><th>Title</th><th>Album</th><th>Genre</th><th>Year</th><th>BPM</th><th>Dur</th></tr>
+                    </thead>
+                    <tbody id="detailSongs"></tbody>
+                </table>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <h6>Genres</h6>
+            <div id="detailGenres" class="mb-3"></div>
+            <h6>Gen Playlists</h6>
+            <div id="detailPlaylists"></div>
+        </div>
+    </div>
+</div>
+
+<!-- SONG DETAIL FROM ARTIST (uses shared module) -->
+<div id="artistSongDetailView" style="display:none;" class="mt-2"></div>
+
+<script src="/js/artists.js?v=2"></script>
+<script>if (typeof artistPage !== 'undefined') artistPage.init();</script>

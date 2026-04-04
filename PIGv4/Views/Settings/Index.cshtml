@@ -1,0 +1,95 @@
+@{
+    ViewData["Title"] = "Settings";
+}
+<nav class="navbar navbar-expand-sm border-bottom box-shadow rounded-4" style="background-color: Maroon">
+    <div class="container-fluid">
+        <div class="navbar-brand" style="color: HotPink;">Settings</div>
+    </div>
+</nav>
+
+<div class="mt-3">
+    <div class="card mb-3">
+        <div class="card-header" style="background-color: Maroon; color: HotPink;">
+            <i class="bi bi-database"></i> Database Backup &amp; Restore
+        </div>
+        <div class="card-body">
+            <div id="dbInfo" class="mb-3 text-muted small"></div>
+
+            <div class="row">
+                <div class="col-md-6">
+                    <h6>Export (Backup)</h6>
+                    <p class="small text-muted">Downloads the database as a compressed zip file.</p>
+                    <button class="btn btn-success" onclick="settingsPage.exportDb()">
+                        <i class="bi bi-download"></i> Download Backup
+                    </button>
+                    <div id="exportStatus" class="mt-2"></div>
+                </div>
+                <div class="col-md-6">
+                    <h6>Import (Restore)</h6>
+                    <p class="small text-muted">Upload a .zip or .db backup file to restore. Current DB is backed up first.</p>
+                    <input type="file" id="importFile" class="form-control form-control-sm mb-2" accept=".db,.zip" />
+                    <button class="btn btn-warning" onclick="settingsPage.importDb()">
+                        <i class="bi bi-upload"></i> Restore from Backup
+                    </button>
+                    <div id="importStatus" class="mt-2"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const settingsPage = {
+    async init() {
+        var resp = await fetch('/Settings/DbInfo');
+        var info = await resp.json();
+        document.getElementById('dbInfo').textContent =
+            'Database: ' + info.path + ' | Size: ' + info.sizeMb + ' MB | Last modified: ' + new Date(info.lastModified).toLocaleString();
+    },
+
+    async exportDb() {
+        var indicator = document.getElementById('backupIndicator');
+        var status = document.getElementById('exportStatus');
+        indicator.style.setProperty('display', 'flex', 'important');
+        status.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Zipping and downloading... this will take a while for large databases.';
+
+        // Trigger download via hidden iframe
+        var iframe = document.createElement('iframe');
+        iframe.style.display = 'none';
+        iframe.src = '/Settings/ExportDb';
+        document.body.appendChild(iframe);
+
+        // Keep spinner going — user clicks Done when download finishes
+        status.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Backup in progress... check your browser downloads. '
+            + '<button class="btn btn-sm btn-outline-success ms-2" onclick="settingsPage.exportDone()">Done</button>';
+    },
+
+    exportDone() {
+        document.getElementById('backupIndicator').style.setProperty('display', 'none', 'important');
+        document.getElementById('exportStatus').innerHTML = '<span class="text-success">Backup complete.</span>';
+    },
+
+    async importDb() {
+        var fileInput = document.getElementById('importFile');
+        if (!fileInput.files.length) { alert('Select a file first.'); return; }
+        if (!confirm('This will replace the current database. A backup of the current DB will be saved. Continue?')) return;
+
+        var formData = new FormData();
+        formData.append('dbFile', fileInput.files[0]);
+
+        document.getElementById('importStatus').innerHTML = '<span class="spinner-border spinner-border-sm"></span> Restoring...';
+
+        var resp = await fetch('/Settings/ImportDb', { method: 'POST', body: formData });
+        var data = await resp.json();
+        var status = document.getElementById('importStatus');
+
+        if (data.success) {
+            status.innerHTML = '<span class="text-success">Restored! Previous DB saved as ' + data.backup + '. Restart the app to use the new database.</span>';
+        } else {
+            status.innerHTML = '<span class="text-danger">Error: ' + data.error + '</span>';
+        }
+    }
+};
+
+document.addEventListener('DOMContentLoaded', () => settingsPage.init());
+</script>

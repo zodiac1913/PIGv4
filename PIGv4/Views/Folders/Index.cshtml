@@ -1,0 +1,186 @@
+@{
+    ViewData["Title"] = "Folders";
+}
+<nav class="navbar navbar-expand-sm border-bottom box-shadow rounded-4" style="background-color: Maroon">
+    <div class="container-fluid">
+        <div class="navbar-brand" style="color: HotPink;">Folders</div>
+    </div>
+</nav>
+
+<!-- FOLDER LIST VIEW -->
+<div id="folderListView" class="mt-2">
+    <div class="row mb-2">
+        <div class="col-md-6">
+            <div class="input-group input-group-sm">
+                <input type="text" id="newFolderName" class="form-control" placeholder="New folder name..." />
+                <button class="btn btn-outline-success" onclick="folderPage.addFolder()"><i class="bi bi-plus-lg"></i> Add Folder</button>
+            </div>
+        </div>
+        <div class="col-md-6 text-end">
+            <small class="text-muted"><span id="folderCount">0</span> folders</small>
+        </div>
+    </div>
+    <div class="table-responsive" style="max-height: 70vh; overflow-y: auto;">
+        <table class="table table-sm table-striped table-hover align-middle mb-0">
+            <thead class="sticky-top table-dark">
+                <tr><th>Folder</th><th>Songs</th><th></th></tr>
+            </thead>
+            <tbody id="folderTableBody"></tbody>
+        </table>
+    </div>
+</div>
+
+<!-- FOLDER DETAIL VIEW -->
+<div id="folderDetailView" style="display:none;" class="mt-2">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <div>
+            <button class="btn btn-outline-secondary btn-sm me-2" onclick="folderPage.backToList()"><i class="bi bi-arrow-left"></i> Back</button>
+            <strong id="folderDetailName" style="color: Maroon;"></strong>
+            <span class="text-muted ms-2">(<span id="folderSongCount">0</span> songs)</span>
+        </div>
+        <div class="d-flex align-items-center">
+            <button class="btn btn-sm btn-outline-warning me-2" onclick="folderPage.selectAll()"><i class="bi bi-check-all"></i> Select All</button>
+            <select id="moveTarget" class="form-select form-select-sm me-1" style="width:200px;"></select>
+            <button class="btn btn-sm btn-success" onclick="folderPage.moveSelected()"><i class="bi bi-arrow-right-circle"></i> Move</button>
+        </div>
+    </div>
+    <div class="input-group input-group-sm mb-2" style="max-width:300px;">
+        <span class="input-group-text"><i class="bi bi-search"></i></span>
+        <input type="text" id="folderSongSearch" class="form-control" placeholder="Search songs..." oninput="folderPage.filterSongs(this.value)" />
+    </div>
+    <div class="table-responsive" style="max-height: 60vh; overflow-y: auto;">
+        <table class="table table-sm table-striped table-hover align-middle mb-0">
+            <thead class="sticky-top table-dark">
+                <tr><th style="width:30px;"><input type="checkbox" class="form-check-input" onchange="folderPage.toggleAll(this.checked)" /></th><th>Artist</th><th>Title</th><th>Album</th><th>Genre</th></tr>
+            </thead>
+            <tbody id="folderSongBody"></tbody>
+        </table>
+    </div>
+</div>
+
+<!-- SONG DETAIL FROM FOLDERS (uses shared module) -->
+<div id="folderSongDetailView" style="display:none;" class="mt-2"></div>
+
+<script>
+const folderPage = {
+    _currentFolder: null,
+    _allFolders: [],
+
+    async init() {
+        document.getElementById('folderListView').style.display = 'block';
+        document.getElementById('folderDetailView').style.display = 'none';
+        this.browse();
+    },
+
+    async browse() {
+        var resp = await fetch('/Folders/Browse');
+        var data = await resp.json();
+        this._allFolders = data.map(f => f.folder);
+        document.getElementById('folderCount').textContent = data.length;
+        var tbody = document.getElementById('folderTableBody');
+        tbody.innerHTML = '';
+        data.forEach(f => {
+            var tr = document.createElement('tr');
+            tr.style.cursor = 'pointer';
+            tr.innerHTML = '<td>' + this.esc(f.folder) + '</td><td>' + f.songCount + '</td>'
+                + '<td><button class="btn btn-sm btn-outline-warning" onclick="folderPage.renameFolder(\'' + this.esc(f.folder).replace(/'/g,"\\'") + '\'); event.stopPropagation();" title="Rename"><i class="bi bi-pencil"></i></button></td>';
+            tr.addEventListener('click', () => this.openFolder(f.folder));
+            tbody.appendChild(tr);
+        });
+    },
+
+    async openFolder(folder) {
+        this._currentFolder = folder;
+        document.getElementById('folderDetailName').textContent = folder;
+        var resp = await fetch('/Folders/Songs?folder=' + encodeURIComponent(folder));
+        var songs = await resp.json();
+        document.getElementById('folderSongCount').textContent = songs.length;
+
+        // Populate move target dropdown
+        var sel = document.getElementById('moveTarget');
+        sel.innerHTML = '<option value="">Move to...</option>';
+        this._allFolders.filter(f => f !== folder).forEach(f => {
+            var o = document.createElement('option'); o.value = f; o.textContent = f; sel.appendChild(o);
+        });
+        // Add "New folder..." option
+        var newOpt = document.createElement('option'); newOpt.value = '__new__'; newOpt.textContent = '+ New folder...'; sel.appendChild(newOpt);
+
+        var tbody = document.getElementById('folderSongBody');
+        tbody.innerHTML = '';
+        songs.forEach(s => {
+            var tr = document.createElement('tr');
+            tr.innerHTML = '<td><input type="checkbox" class="form-check-input song-check" value="' + s.pieceId + '" /></td>'
+                + '<td>' + this.esc(s.artist) + '</td><td>' + this.esc(s.title) + '</td>'
+                + '<td>' + this.esc(s.album) + '</td><td>' + this.esc(s.genre) + '</td>';
+            tbody.appendChild(tr);
+        });
+
+        document.getElementById('folderListView').style.display = 'none';
+        document.getElementById('folderDetailView').style.display = 'block';
+    },
+
+    filterSongs(term) {
+        term = term.toLowerCase();
+        document.querySelectorAll('#folderSongBody tr').forEach(tr => {
+            tr.style.display = tr.textContent.toLowerCase().indexOf(term) >= 0 ? '' : 'none';
+        });
+    },
+
+    toggleAll(checked) {
+        document.querySelectorAll('.song-check').forEach(cb => cb.checked = checked);
+    },
+
+    selectAll() {
+        document.querySelectorAll('.song-check').forEach(cb => cb.checked = true);
+    },
+
+    async moveSelected() {
+        var target = document.getElementById('moveTarget').value;
+        if (!target) { alert('Select a target folder.'); return; }
+        if (target === '__new__') {
+            target = prompt('Enter new folder name:');
+            if (!target) return;
+        }
+        var ids = [];
+        document.querySelectorAll('.song-check:checked').forEach(cb => ids.push(parseInt(cb.value)));
+        if (ids.length === 0) { alert('Select songs to move.'); return; }
+        if (!confirm('Move ' + ids.length + ' song(s) to "' + target + '"?')) return;
+
+        var resp = await fetch('/Folders/MoveSongs', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ PieceIds: ids, TargetFolder: target })
+        });
+        if (resp.ok) this.openFolder(this._currentFolder);
+    },
+
+    async renameFolder(oldName) {
+        var newName = prompt('Rename "' + oldName + '" to:', oldName);
+        if (!newName || newName === oldName) return;
+        var resp = await fetch('/Folders/RenameFolder', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ OldName: oldName, NewName: newName })
+        });
+        if (resp.ok) this.browse();
+    },
+
+    addFolder() {
+        var name = document.getElementById('newFolderName').value.trim();
+        if (!name) { alert('Enter a folder name.'); return; }
+        // Just add to the list — it'll exist once songs are moved into it
+        this._allFolders.push(name);
+        alert('Folder "' + name + '" created. Move songs into it to populate.');
+        document.getElementById('newFolderName').value = '';
+    },
+
+    backToList() {
+        document.getElementById('folderDetailView').style.display = 'none';
+        document.getElementById('folderListView').style.display = 'block';
+        this.browse();
+    },
+
+    esc(v) { return (v || '').toString().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+};
+
+document.addEventListener('DOMContentLoaded', () => folderPage.init());
+if (document.readyState !== 'loading') folderPage.init();
+</script>
