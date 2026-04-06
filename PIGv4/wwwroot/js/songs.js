@@ -1,4 +1,4 @@
-const songPage = {
+var songPage = {
     searchTimer: null,
     currentPage: 1,
     totalPages: 1,

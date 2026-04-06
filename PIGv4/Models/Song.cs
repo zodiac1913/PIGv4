@@ -43,6 +43,13 @@ public class Piece
     
     public byte[]? Mp3 { get; set; }
     
+    /// <summary>Cached URL for album art (Cover Art Archive or Wikipedia).</summary>
+    [StringLength(500)]
+    public string? AlbumArtUrl { get; set; }
+    
+    /// <summary>True = we looked and there's no art available. Don't look again.</summary>
+    public bool AlbumArtChecked { get; set; }
+    
     [Required]
     [StringLength(50)]
     public string Creator { get; set; } = "";
@@ -80,4 +87,6 @@ public class PieceInfo
     public string? Editor { get; set; }
     public DateTime? Edited { get; set; }
     public bool IsNew { get; set; }
+    public string? AlbumArtUrl { get; set; }
+    public bool AlbumArtChecked { get; set; }
 }

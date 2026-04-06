@@ -39,14 +39,8 @@ public class PlayerController : Controller
         // If Gen Playlists are selected, resolve full song lists (title + artist expansion)
         if (listIds != null && listIds.Count > 0)
         {
-            var allHashes = new HashSet<string>();
-            foreach (var lid in listIds)
-            {
-                var hashes = await PlaylistResolver.ResolveAudioHashes(_context, lid);
-                foreach (var h in hashes) allHashes.Add(h);
-            }
-            var hashList = allHashes.ToList();
-            query = query.Where(p => hashList.Contains(p.AudioHash));
+            var allHashes = await PlaylistResolver.ResolveAudioHashes(_context, listIds);
+            query = query.Where(p => allHashes.Contains(p.AudioHash));
         }
 
         if (genres != null && genres.Count > 0)
@@ -102,33 +96,137 @@ public class PlayerController : Controller
         return Json(new { song, playlists = playlistNames });
     }
 
-    /// <summary>Get album art embedded in the MP3 file.</summary>
+    /// <summary>Get album art: embedded in MP3, or return cached URL for external art.</summary>
     [HttpGet]
     public async Task<IActionResult> AlbumArt(int id)
     {
         var piece = await _context.Piece
             .Where(p => p.PieceId == id)
-            .Select(p => new { p.Mp3, p.FileName })
+            .Select(p => new { p.PieceId, p.Mp3, p.AlbumArtUrl, p.AlbumArtChecked, p.Artist, p.Album })
             .FirstOrDefaultAsync();
 
-        if (piece?.Mp3 == null) return NotFound();
+        if (piece == null) return NotFound();
 
-        try
+        // 1. If we have a cached URL, return it as JSON
+        if (!string.IsNullOrEmpty(piece.AlbumArtUrl))
+            return Json(new { url = piece.AlbumArtUrl });
+
+        // 2. Already checked and nothing found
+        if (piece.AlbumArtChecked)
+            return NotFound();
+
+        // 3. Try embedded art in MP3
+        if (piece.Mp3 != null)
         {
-            var tempPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}.mp3");
-            await System.IO.File.WriteAllBytesAsync(tempPath, piece.Mp3);
-            using var tagFile = TagLib.File.Create(tempPath);
-            System.IO.File.Delete(tempPath);
-
-            if (tagFile.Tag.Pictures.Length > 0)
+            try
             {
-                var pic = tagFile.Tag.Pictures[0];
-                return File(pic.Data.Data, pic.MimeType);
+                var tempPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}.mp3");
+                await System.IO.File.WriteAllBytesAsync(tempPath, piece.Mp3);
+                using var tagFile = TagLib.File.Create(tempPath);
+                System.IO.File.Delete(tempPath);
+
+                if (tagFile.Tag.Pictures.Length > 0)
+                {
+                    var pic = tagFile.Tag.Pictures[0];
+                    return File(pic.Data.Data, pic.MimeType);
+                }
             }
+            catch { }
         }
-        catch { }
+
+        // 4. Fire background lookup for URL (Cover Art Archive → Wikipedia)
+        _ = Task.Run(async () => await FetchAndCacheArtUrl(piece.PieceId, piece.Artist, piece.Album));
+
+        // Mark as checked
+        var p2 = await _context.Piece.FindAsync(piece.PieceId);
+        if (p2 != null)
+        {
+            p2.AlbumArtChecked = true;
+            await _context.SaveChangesAsync();
+        }
 
         return NotFound();
+    }
+
+    private static readonly HttpClient _artClient = new()
+    {
+        DefaultRequestHeaders = { { "User-Agent", "PIGv4/1.0 (playlist-intelligent-generator)" } }
+    };
+
+    private async Task FetchAndCacheArtUrl(int pieceId, string? artist, string? album)
+    {
+        if (string.IsNullOrEmpty(artist)) return;
+        string? artUrl = null;
+
+        // Step 1: Try Cover Art Archive
+        if (!string.IsNullOrEmpty(album))
+        {
+            try
+            {
+                var searchUrl = $"https://musicbrainz.org/ws/2/release/?query=artist:{Uri.EscapeDataString(artist)}+release:{Uri.EscapeDataString(album)}&fmt=json&limit=1";
+                var searchJson = await _artClient.GetStringAsync(searchUrl);
+                using var doc = System.Text.Json.JsonDocument.Parse(searchJson);
+                var releases = doc.RootElement.GetProperty("releases");
+                if (releases.GetArrayLength() > 0)
+                {
+                    var releaseId = releases[0].GetProperty("id").GetString();
+                    if (!string.IsNullOrEmpty(releaseId))
+                        artUrl = $"https://coverartarchive.org/release/{releaseId}/front-250";
+                }
+            }
+            catch { }
+        }
+
+        // Step 2: Try Wikipedia artist image
+        if (string.IsNullOrEmpty(artUrl))
+        {
+            try
+            {
+                await Task.Delay(500);
+                var wikiUrl = $"https://en.wikipedia.org/wiki/{Uri.EscapeDataString(artist.Replace(" ", "_"))}";
+                var html = await _artClient.GetStringAsync(wikiUrl);
+
+                var marker = "infobox-image";
+                var idx = html.IndexOf(marker);
+                if (idx > 0)
+                {
+                    var imgStart = html.IndexOf("<img", idx);
+                    if (imgStart > 0 && imgStart < idx + 2000)
+                    {
+                        var srcStart = html.IndexOf("src=\"", imgStart);
+                        if (srcStart > 0)
+                        {
+                            srcStart += 5;
+                            var srcEnd = html.IndexOf("\"", srcStart);
+                            var imgSrc = html.Substring(srcStart, srcEnd - srcStart);
+                            if (imgSrc.StartsWith("//")) imgSrc = "https:" + imgSrc;
+                            artUrl = imgSrc;
+                        }
+                    }
+                }
+            }
+            catch { }
+        }
+
+        // Save URL if found
+        if (!string.IsNullOrEmpty(artUrl))
+        {
+            try
+            {
+                var connStr = _context.Database.GetConnectionString();
+                var opts = new Microsoft.EntityFrameworkCore.DbContextOptionsBuilder<PigContext>()
+                    .UseSqlite(connStr).Options;
+                using var db = new PigContext(opts);
+                var entity = await db.Piece.FindAsync(pieceId);
+                if (entity != null)
+                {
+                    entity.AlbumArtUrl = artUrl;
+                    entity.AlbumArtChecked = true;
+                    await db.SaveChangesAsync();
+                }
+            }
+            catch { }
+        }
     }
 
     /// <summary>Get distinct filter values. Pass type=folders, genres, or artists.</summary>

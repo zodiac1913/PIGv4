@@ -27,21 +27,30 @@ using (var scope = app.Services.CreateScope())
     
     db.Database.EnsureCreated();
     
-    // Create view and indexes if they don't exist
-    db.Database.ExecuteSqlRaw(@"
-        CREATE VIEW IF NOT EXISTS PieceInfo AS
+    // Create view and indexes if they don't exist (wrapped in try-catch for existing DBs)
+    try { db.Database.ExecuteSqlRaw(@"
+        DROP VIEW IF EXISTS PieceInfo;
+        CREATE VIEW PieceInfo AS
         SELECT PieceId, AudioHash, Artist, Title, Genre, Album, Year, Seconds, BPM,
-               FileName, FileSize, SourceFolder, Creator, Created, Editor, Edited, IsNew
+               FileName, FileSize, SourceFolder, Creator, Created, Editor, Edited, IsNew,
+               AlbumArtUrl, AlbumArtChecked
         FROM Piece;
-    ");
-    db.Database.ExecuteSqlRaw("CREATE INDEX IF NOT EXISTS IX_Piece_SourceFolder ON Piece(SourceFolder);");
-    db.Database.ExecuteSqlRaw("CREATE INDEX IF NOT EXISTS IX_Piece_Genre ON Piece(Genre);");
-    db.Database.ExecuteSqlRaw("CREATE INDEX IF NOT EXISTS IX_Piece_Artist ON Piece(Artist);");
-    db.Database.ExecuteSqlRaw("CREATE INDEX IF NOT EXISTS IX_Piece_Title ON Piece(Title);");
-    db.Database.ExecuteSqlRaw("CREATE INDEX IF NOT EXISTS IX_Piece_IsNew ON Piece(IsNew);");
-    db.Database.ExecuteSqlRaw("CREATE INDEX IF NOT EXISTS IX_Piece_FileName ON Piece(FileName);");
-    db.Database.ExecuteSqlRaw("CREATE INDEX IF NOT EXISTS IX_Piece_Artist_Title ON Piece(Artist, Title);");
-    db.Database.ExecuteSqlRaw("CREATE INDEX IF NOT EXISTS IX_ListFilter_ListId ON ListFilter(ListId);");
+    "); } catch { }
+    
+    var indexes = new[] {
+        "CREATE INDEX IF NOT EXISTS IX_Piece_SourceFolder ON Piece(SourceFolder);",
+        "CREATE INDEX IF NOT EXISTS IX_Piece_Genre ON Piece(Genre);",
+        "CREATE INDEX IF NOT EXISTS IX_Piece_Artist ON Piece(Artist);",
+        "CREATE INDEX IF NOT EXISTS IX_Piece_Title ON Piece(Title);",
+        "CREATE INDEX IF NOT EXISTS IX_Piece_IsNew ON Piece(IsNew);",
+        "CREATE INDEX IF NOT EXISTS IX_Piece_FileName ON Piece(FileName);",
+        "CREATE INDEX IF NOT EXISTS IX_Piece_Artist_Title ON Piece(Artist, Title);",
+        "CREATE INDEX IF NOT EXISTS IX_ListFilter_ListId ON ListFilter(ListId);"
+    };
+    foreach (var sql in indexes)
+    {
+        try { db.Database.ExecuteSqlRaw(sql); } catch { }
+    }
 }
 
 // Configure the HTTP request pipeline.

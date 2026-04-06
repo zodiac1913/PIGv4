@@ -137,6 +137,21 @@ const pigPlayer = {
 
     async browse(page) {
         this.currentPage = page || 1;
+
+        // Don't load anything if no filters are checked
+        var hasFilters = this.getChecked('filterGenPlaylists').length > 0
+            || this.getChecked('filterFolders').length > 0
+            || this.getChecked('filterGenres').length > 0
+            || this.getChecked('filterArtists').length > 0
+            || this.pickedSongIds.size > 0;
+
+        if (!hasFilters) {
+            document.getElementById('browseCount').textContent = '0';
+            document.getElementById('songList').innerHTML = '<div class="text-muted small text-center mt-2">Select a playlist, folder, genre, or artist to browse songs.</div>';
+            this.playlist = [];
+            return;
+        }
+
         try {
             const resp = await fetch(this.buildBrowseUrl());
             const data = await resp.json();
@@ -243,11 +258,32 @@ const pigPlayer = {
 
                 // Try to load album art
                 var artImg = document.getElementById('sidebarAlbumArt');
-                artImg.src = '/Player/AlbumArt?id=' + pieceId;
-                artImg.style.display = 'block';
-                artImg.onerror = function() { this.style.display = 'none'; };
+                try {
+                    var artResp = await fetch('/Player/AlbumArt?id=' + pieceId);
+                    if (artResp.ok) {
+                        var contentType = artResp.headers.get('content-type') || '';
+                        if (contentType.indexOf('json') >= 0) {
+                            var artData = await artResp.json();
+                            artImg.src = artData.url;
+                        } else {
+                            artImg.src = '/Player/AlbumArt?id=' + pieceId;
+                        }
+                        artImg.style.display = 'block';
+                        artImg.onerror = function() { this.style.display = 'none'; };
+                    } else {
+                        artImg.style.display = 'none';
+                    }
+                } catch(e) { artImg.style.display = 'none'; }
             }
         } catch (e) {}
+    },
+
+    showFullArt() {
+        var thumb = document.getElementById('sidebarAlbumArt');
+        if (!thumb.src || thumb.style.display === 'none') return;
+        var lb = document.getElementById('artLightbox');
+        document.getElementById('artLightboxImg').src = thumb.src;
+        lb.style.display = 'flex';
     },
 
     async editCurrentSong() {
@@ -260,10 +296,14 @@ const pigPlayer = {
 
     toggle() {
         if (!this.audio.src || this.audio.src === window.location.href) {
-            // No song loaded — start playing the first song in the list
+            // No song loaded — start playing
             if (this.playlist.length > 0) {
-                this.currentIndex = 0;
-                this.playSong(this.playlist[0]);
+                if (this.shuffle) {
+                    this.currentIndex = Math.floor(Math.random() * this.playlist.length);
+                } else {
+                    this.currentIndex = 0;
+                }
+                this.playSong(this.playlist[this.currentIndex]);
             }
             return;
         }

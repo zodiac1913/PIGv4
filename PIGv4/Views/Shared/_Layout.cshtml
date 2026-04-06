@@ -126,7 +126,7 @@
                         <div><span style="color:cyan;">Gen Playlists:</span> <span id="sidebarPlaylists" style="color:HotPink;"></span></div>
                     </div>
                     <div class="ms-2 text-center">
-                        <img id="sidebarAlbumArt" src="" alt="" style="display:none; max-width:60px; max-height:60px; border-radius:4px;" />
+                        <img id="sidebarAlbumArt" src="" alt="" style="display:none; max-width:60px; max-height:60px; border-radius:4px; cursor:pointer;" onclick="pigPlayer.showFullArt()" />
                         <div class="mt-1">
                             <button class="btn btn-sm btn-outline-light py-0 px-1" id="sidebarEditBtn" onclick="pigPlayer.editCurrentSong()" title="Edit song tags &amp; playlists" style="display:none;">
                                 <i class="bi bi-pencil"></i>
@@ -203,6 +203,11 @@
             </div>
         </div>
     </div>
+</div>
+
+<!-- Album Art Lightbox -->
+<div id="artLightbox" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:9999; cursor:pointer; justify-content:center; align-items:center;" onclick="this.style.display='none'">
+    <img id="artLightboxImg" src="" style="max-width:90vw; max-height:90vh; border-radius:8px; box-shadow:0 0 30px rgba(255,105,180,0.5);" />
 </div>
 
 <!-- Song Edit Modal (from player) -->
