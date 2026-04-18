@@ -127,7 +127,7 @@ const pigPlayer = {
         const artists = this.getChecked('filterArtists');
         const listIds = this.getChecked('filterGenPlaylists');
 
-        let url = '/Player/Browse?page=' + this.currentPage + '&pageSize=' + (pageSize || 50);
+        let url = '/Player/Browse?page=' + this.currentPage + '&pageSize=' + (pageSize || 10000);
         listIds.forEach(id => url += '&listIds=' + encodeURIComponent(id));
         folders.forEach(f => url += '&folders=' + encodeURIComponent(f));
         genres.forEach(g => url += '&genres=' + encodeURIComponent(g));
@@ -328,31 +328,21 @@ const pigPlayer = {
         // Mark current song as played
         if (this._currentSong) this.playedIds.add(this._currentSong.pieceId);
 
-        if (this.shuffle) {
-            // Get unplayed songs
-            var unplayed = this.playlist.filter(s => !this.playedIds.has(s.pieceId));
-            if (unplayed.length === 0) {
-                if (this.repeatMode === 'all') {
-                    // Reset pool and go again
-                    this.playedIds.clear();
-                    unplayed = this.playlist.slice();
-                } else {
-                    this.stop();
-                    return;
+        // Just go to next in the list (already shuffled if shuffle is on)
+        this.currentIndex++;
+        if (this.currentIndex >= this.playlist.length) {
+            if (this.repeatMode === 'all') {
+                this.currentIndex = 0;
+                if (this.shuffle) {
+                    // Re-shuffle for the next round
+                    this.shuffleArray(this.playlist);
+                    this.renderSongList(this.playlist);
                 }
-            }
-            var pick = unplayed[Math.floor(Math.random() * unplayed.length)];
-            this.currentIndex = this.playlist.indexOf(pick);
-        } else {
-            this.currentIndex++;
-            if (this.currentIndex >= this.playlist.length) {
-                if (this.repeatMode === 'all') {
-                    this.currentIndex = 0;
-                } else {
-                    this.currentIndex = this.playlist.length - 1;
-                    this.stop();
-                    return;
-                }
+                this.playedIds.clear();
+            } else {
+                this.currentIndex = this.playlist.length - 1;
+                this.stop();
+                return;
             }
         }
         this.playSong(this.playlist[this.currentIndex]);
@@ -492,7 +482,23 @@ const pigPlayer = {
 
     toggleShuffle() {
         this.shuffle = !this.shuffle;
+        if (this.shuffle) {
+            // Shuffle the playlist in place
+            this.shuffleArray(this.playlist);
+            this.currentIndex = 0;
+            this.playedIds.clear();
+            this.renderSongList(this.playlist);
+        }
         this.updateShuffleRepeatButtons();
+    },
+
+    shuffleArray(arr) {
+        for (var i = arr.length - 1; i > 0; i--) {
+            var j = Math.floor(Math.random() * (i + 1));
+            var temp = arr[i];
+            arr[i] = arr[j];
+            arr[j] = temp;
+        }
     },
 
     toggleRepeat() {

@@ -34,25 +34,44 @@ public class PlayerController : Controller
         string? search,
         int page = 1, int pageSize = 50)
     {
-        var query = _context.PieceInfo.AsQueryable();
+        // Build separate queries for each filter type, then UNION them (OR logic)
+        var queries = new List<IQueryable<PieceInfo>>();
 
-        // If Gen Playlists are selected, resolve full song lists (title + artist expansion)
         if (listIds != null && listIds.Count > 0)
         {
             var allHashes = await PlaylistResolver.ResolveAudioHashes(_context, listIds);
-            query = query.Where(p => allHashes.Contains(p.AudioHash));
+            queries.Add(_context.PieceInfo.Where(p => allHashes.Contains(p.AudioHash)));
         }
 
         if (genres != null && genres.Count > 0)
-            query = query.Where(p => p.Genre != null && genres.Contains(p.Genre));
+            queries.Add(_context.PieceInfo.Where(p => p.Genre != null && genres.Contains(p.Genre)));
         if (artists != null && artists.Count > 0)
-            query = query.Where(p => p.Artist != null && artists.Contains(p.Artist));
+            queries.Add(_context.PieceInfo.Where(p => p.Artist != null && artists.Contains(p.Artist)));
         if (folders != null && folders.Count > 0)
-            query = query.Where(p => p.SourceFolder != null && folders.Contains(p.SourceFolder));
+            queries.Add(_context.PieceInfo.Where(p => p.SourceFolder != null && folders.Contains(p.SourceFolder)));
 
-        // Christmas blackout: Jan 15 – Thanksgiving (4th Thursday of November)
+        IQueryable<PieceInfo> query;
+        if (queries.Count == 0)
+        {
+            // No filters — return empty
+            return Json(new { total = 0, page, pageSize, songs = new List<object>() });
+        }
+        else if (queries.Count == 1)
+        {
+            query = queries[0];
+        }
+        else
+        {
+            // Union all queries
+            query = queries[0];
+            for (int i = 1; i < queries.Count; i++)
+                query = query.Union(queries[i]);
+        }
+
+        // Christmas blackout
         if (!IsChristmasSeason())
             query = query.Where(p => p.SourceFolder != "Christmas");
+
         if (!string.IsNullOrWhiteSpace(search))
             query = query.Where(p =>
                 (p.Title != null && p.Title.Contains(search)) ||
