@@ -114,6 +114,7 @@ public class ImpexController : Controller
 
             _context.Piece.Add(piece);
             await _context.SaveChangesAsync();
+            await PlaylistResolver.UpdateLookup(_context, piece);
 
             return Json(new
             {

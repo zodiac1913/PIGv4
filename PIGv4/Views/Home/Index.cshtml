@@ -2,9 +2,147 @@
     ViewData["Title"] = "Playlist Intelligent Generator v4.0";
 }
 
-<div class="text-center mt-4">
-    <img src="~/pics/pig.png" alt="PIG Rock and Roll"
-         style="border-radius: 50%; max-height: 400px; object-fit: contain;" />
-    <h1 class="display-4 mt-3" style="color: HotPink;">Welcome</h1>
-    <p class="text-muted">To the Playlist Intelligent Generator v4.0</p>
+<!-- Row 1: PIG logo + welcome -->
+<div class="home-hero d-flex flex-wrap align-items-center mt-3">
+    <img id="pigLogo" src="~/pics/pig.png" alt="PIG Rock and Roll" class="pig-logo" />
+    <div class="text-center ms-3 mt-2 d-none d-md-block">
+        <p class="text-muted mb-0">Playlist<br /> Intelligent<br /> Generator<br /> v4.0</p>
+    </div>
+    <!-- Album art (appears when playing) -->
+    <div class="ms-auto me-2 text-center d-none d-md-block">
+        <img id="homeAlbumArt" src="" alt="" class="home-album-art" style="display:none;" onclick="pigPlayer.showFullArt()" />
+        <div class="mt-1">
+            <button class="btn btn-sm btn-outline-secondary py-0 px-1" id="homeEditBtn" onclick="pigPlayer.editCurrentSong()" title="Edit song tags" style="display:none;">
+                <i class="bi bi-pencil"></i>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Row 2: Now-playing info -->
+<div class="home-now-playing d-flex flex-wrap gap-2 mt-2 px-1" style="font-size:1.7rem;">
+    <div>
+        <span class="info-label">Title:</span>
+        <span id="homeTitle">—</span>
+    </div>
+    <div>
+        <span class="info-label">Artist:</span>
+        <span id="homeArtist">—</span>
+    </div>
+    <div>
+        <span class="info-label">Album:</span>
+        <span id="homeAlbum">—</span>
+    </div>
+    <div>
+        <span class="info-label">Genre:</span>
+        <span id="homeGenre">—</span>
+    </div>
+    <div>
+        <span class="info-label">Year:</span>
+        <span id="homeYear">—</span>
+    </div>
+</div>
+
+<!-- Row 3: Select Music accordion -->
+<div class="mt-2">
+    <div class="accordion w-100" id="musicSelectAccordion">
+        <div class="accordion-item" style="border-color: Maroon;">
+            <h2 class="accordion-header">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#musicSelectBody" style="background-color: Maroon; color: HotPink;">
+                    <i class="bi bi-sliders me-2"></i> Select Music
+                </button>
+            </h2>
+            <div id="musicSelectBody" class="accordion-collapse collapse" data-bs-parent="#musicSelectAccordion">
+                <div class="accordion-body p-2">
+                    <!-- Gen Playlists -->
+                    <div class="mb-1">
+                        <a class="d-flex justify-content-between align-items-center text-decoration-none small" data-bs-toggle="collapse" href="#homeGenPlaylistList">
+                            <span><i class="bi bi-collection-play me-1"></i>Gen Playlists</span>
+                            <span id="homeGenPlaylistBadge" class="badge bg-secondary">0</span>
+                        </a>
+                        <div class="collapse" id="homeGenPlaylistList">
+                            <input type="text" class="form-control form-control-sm border-secondary mt-1 mb-1"
+                                   placeholder="Filter playlists..." data-target="homeFilterGenPlaylists" oninput="pigPlayer.filterCheckList(this)" />
+                            <div class="filter-check-list mt-1" id="homeFilterGenPlaylists"></div>
+                        </div>
+                    </div>
+                    <!-- Folders -->
+                    <div class="mb-1">
+                        <a class="d-flex justify-content-between align-items-center text-decoration-none small" data-bs-toggle="collapse" href="#homeFolderList">
+                            <span><i class="bi bi-folder me-1"></i>Folders</span>
+                            <span id="homeFolderBadge" class="badge bg-secondary">0</span>
+                        </a>
+                        <div class="collapse" id="homeFolderList">
+                            <input type="text" class="form-control form-control-sm border-secondary mt-1 mb-1"
+                                   placeholder="Filter folders..." data-target="homeFilterFolders" oninput="pigPlayer.filterCheckList(this)" />
+                            <div class="filter-check-list mt-1" id="homeFilterFolders"></div>
+                        </div>
+                    </div>
+                    <!-- Genres -->
+                    <div class="mb-1">
+                        <a class="d-flex justify-content-between align-items-center text-decoration-none small" data-bs-toggle="collapse" href="#homeGenreList">
+                            <span><i class="bi bi-music-note me-1"></i>Genres</span>
+                            <span id="homeGenreBadge" class="badge bg-secondary">0</span>
+                        </a>
+                        <div class="collapse" id="homeGenreList">
+                            <input type="text" class="form-control form-control-sm border-secondary mt-1 mb-1"
+                                   placeholder="Filter genres..." data-target="homeFilterGenres" oninput="pigPlayer.filterCheckList(this)" />
+                            <div class="filter-check-list mt-1" id="homeFilterGenres"></div>
+                        </div>
+                    </div>
+                    <!-- Artists -->
+                    <div class="mb-1">
+                        <a class="d-flex justify-content-between align-items-center text-decoration-none small" data-bs-toggle="collapse" href="#homeArtistList">
+                            <span><i class="bi bi-person me-1"></i>Artists</span>
+                            <span id="homeArtistBadge" class="badge bg-secondary">0</span>
+                        </a>
+                        <div class="collapse" id="homeArtistList">
+                            <input type="text" class="form-control form-control-sm border-secondary mt-1 mb-1"
+                                   placeholder="Filter artists..." data-target="homeFilterArtists" oninput="pigPlayer.filterCheckList(this)" />
+                            <div class="filter-check-list mt-1" id="homeFilterArtists"></div>
+                        </div>
+                    </div>
+                    <hr class="my-2" />
+                    <div class="d-flex justify-content-between align-items-center">
+                        <small class="text-muted"><span id="homeBrowseCount">0</span> songs in queue</small>
+                        <button class="btn btn-outline-danger btn-sm py-0 px-2" onclick="pigPlayer.clearQueue()" title="Clear queue and uncheck all filters">
+                            <i class="bi bi-x-circle me-1"></i>Clear
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Row 4: Full-width player controls -->
+<div class="home-player-bar d-flex flex-wrap align-items-center justify-content-center mt-3 p-2 w-100">
+    <div class="player-transport d-flex align-items-center justify-content-center flex-wrap">
+        <button class="btn btn-outline-dark player-btn me-1" onclick="pigPlayer.prev()" title="Previous"><i class="bi bi-skip-backward-fill"></i></button>
+        <button class="btn btn-outline-dark player-btn me-1" id="homePlayBtn" onclick="pigPlayer.toggle()" title="Play/Pause"><i class="bi bi-play-fill"></i></button>
+        <button class="btn btn-outline-dark player-btn me-1" onclick="pigPlayer.stop()" title="Stop"><i class="bi bi-stop-fill"></i></button>
+        <button class="btn btn-outline-dark player-btn me-1" onclick="pigPlayer.next()" title="Next"><i class="bi bi-skip-forward-fill"></i></button>
+        <button class="btn btn-outline-dark player-btn me-1" id="homeShuffleBtn" onclick="pigPlayer.toggleShuffle()" title="Shuffle"><i class="bi bi-shuffle"></i></button>
+        <button class="btn btn-outline-dark player-btn me-1" id="homeRepeatBtn" onclick="pigPlayer.toggleRepeat()" title="Repeat"><i class="bi bi-arrow-repeat"></i></button>
+        <button class="btn btn-outline-dark player-btn me-1" id="homeWakeLockBtn" onclick="pigPlayer.toggleWakeLock()" title="Keep screen on"><i class="bi bi-phone"></i></button>
+    </div>
+    <div class="flex-grow-1 mx-2 player-seek" style="min-width:120px;">
+        <input type="range" id="homeSeekBar" class="form-range" min="0" max="100" value="0" step="0.1" oninput="pigPlayer.seek(this.value)" />
+        <div class="d-flex justify-content-between" style="font-size:0.7rem; margin-top:-8px;">
+            <span id="homeTimeElapsed">0:00</span>
+            <span id="homeTimeDuration">0:00</span>
+        </div>
+    </div>
+    <div class="d-flex align-items-center player-volume" style="min-width:100px;">
+        <i class="bi bi-volume-down me-1"></i>
+        <input type="range" id="homeVolume" class="form-range" min="0" max="100" value="100" step="1" oninput="pigPlayer.setVolume(this.value)" style="width:80px;" />
+        <i class="bi bi-volume-up ms-1"></i>
+    </div>
+</div>
+<!-- Row 2: Now-playing info -->
+<div class="home-now-playing d-flex flex-wrap gap-2 mt-2 px-1" style="font-size:1.7rem;">
+    <div>
+        <span class="info-label">Gen Playlists:</span>
+        <span id="homePlaylists" style="color:HotPink;">—</span>
+    </div>
 </div>

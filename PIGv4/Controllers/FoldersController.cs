@@ -15,7 +15,7 @@ public class FoldersController : Controller
     [HttpGet]
     public async Task<IActionResult> Browse()
     {
-        var folders = await _context.PieceInfo
+        var folders = await _context.PieceLookup
             .GroupBy(p => p.SourceFolder ?? "(No Folder)")
             .Select(g => new { Folder = g.Key, SongCount = g.Count() })
             .OrderBy(f => f.Folder)
@@ -26,7 +26,7 @@ public class FoldersController : Controller
     [HttpGet]
     public async Task<IActionResult> Songs(string folder)
     {
-        var query = _context.PieceInfo.AsQueryable();
+        var query = _context.PieceLookup.AsQueryable();
         if (folder == "(No Folder)")
             query = query.Where(p => p.SourceFolder == null || p.SourceFolder == "");
         else
@@ -52,6 +52,7 @@ public class FoldersController : Controller
             p.Edited = DateTime.Now;
         }
         await _context.SaveChangesAsync();
+        foreach (var p in pieces) await PlaylistResolver.UpdateLookup(_context, p);
         return Json(new { success = true, count = pieces.Count });
     }
 
@@ -68,6 +69,7 @@ public class FoldersController : Controller
             p.Edited = DateTime.Now;
         }
         await _context.SaveChangesAsync();
+        foreach (var p in pieces) await PlaylistResolver.UpdateLookup(_context, p);
         return Json(new { success = true, count = pieces.Count });
     }
 }

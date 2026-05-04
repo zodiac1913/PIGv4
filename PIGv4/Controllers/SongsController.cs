@@ -17,7 +17,7 @@ public class SongsController : Controller
     public async Task<IActionResult> Browse(string? search, string? startsWith, string? folder, bool? newOnly,
         int page = 1, int pageSize = 50)
     {
-        var query = _context.PieceInfo.AsQueryable();
+        var query = _context.PieceLookup.AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(folder))
             query = query.Where(p => p.SourceFolder == folder);
@@ -51,7 +51,7 @@ public class SongsController : Controller
     [HttpGet]
     public async Task<IActionResult> Detail(int id)
     {
-        var piece = await _context.PieceInfo
+        var piece = await _context.PieceLookup
             .Where(p => p.PieceId == id)
             .Select(p => new
             {
@@ -79,7 +79,7 @@ public class SongsController : Controller
         List<object>? artistFlags = null;
         if (!string.IsNullOrEmpty(piece.Artist))
         {
-            var artistHashes = await _context.PieceInfo
+            var artistHashes = await _context.PieceLookup
                 .Where(p => p.Artist == piece.Artist)
                 .Select(p => p.AudioHash).Distinct().ToListAsync();
 
@@ -92,7 +92,7 @@ public class SongsController : Controller
             // Get the song names for tooltip
             var artistFlagDetails = await _context.ListFilter
                 .Where(lf => artistHashes.Contains(lf.AudioHash) && lf.HasArtist == true && lf.AudioHash != piece.AudioHash)
-                .Join(_context.PieceInfo, lf => lf.AudioHash, p => p.AudioHash, (lf, p) => new { lf.ListId, p.Title })
+                .Join(_context.PieceLookup, lf => lf.AudioHash, p => p.AudioHash, (lf, p) => new { lf.ListId, p.Title })
                 .ToListAsync();
 
             artistFlags = artistFlagDetails.Select(a => (object)new { a.ListId, a.Title }).ToList();
@@ -139,6 +139,7 @@ public class SongsController : Controller
         }
 
         await _context.SaveChangesAsync();
+        await PlaylistResolver.UpdateLookup(_context, piece);
         return Json(new { success = true });
     }
 
@@ -177,6 +178,13 @@ public class SongsController : Controller
         piece.Edited = DateTime.Now;
 
         await _context.SaveChangesAsync();
+
+        // Rebuild cache for affected playlists only
+        var affectedListIds = existing.Select(lf => lf.ListId)
+            .Union(req.Filters.Where(f => f.HasTitle || f.HasArtist).Select(f => f.ListId))
+            .Distinct();
+        await PlaylistResolver.RebuildPlaylists(_context, affectedListIds);
+
         return Json(new { success = true });
     }
 
@@ -184,7 +192,7 @@ public class SongsController : Controller
     [HttpGet]
     public async Task<IActionResult> Folders()
     {
-        var folders = await _context.PieceInfo
+        var folders = await _context.PieceLookup
             .Where(p => p.SourceFolder != null)
             .Select(p => p.SourceFolder!).Distinct().OrderBy(f => f).ToListAsync();
         return Json(folders);
@@ -217,6 +225,12 @@ public class SongsController : Controller
 
         _context.Piece.Remove(piece);
         await _context.SaveChangesAsync();
+
+        // Update caches
+        await PlaylistResolver.RemoveLookup(_context, req.PieceId);
+        var affectedListIds = filters.Select(lf => lf.ListId).Distinct();
+        await PlaylistResolver.RebuildPlaylists(_context, affectedListIds);
+
         return Json(new { success = true });
     }
 }

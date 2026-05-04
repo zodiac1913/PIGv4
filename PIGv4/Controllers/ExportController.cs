@@ -16,7 +16,7 @@ public class ExportController : Controller
     [HttpGet]
     public async Task<IActionResult> Unfoldered()
     {
-        var songs = await _context.PieceInfo
+        var songs = await _context.PieceLookup
             .Where(p => p.SourceFolder == null || p.SourceFolder == "")
             .OrderBy(p => p.Artist).ThenBy(p => p.Title)
             .Select(p => new { p.PieceId, p.Title, p.Artist, p.FileName })
@@ -43,11 +43,11 @@ public class ExportController : Controller
     [HttpGet]
     public async Task<IActionResult> Options()
     {
-        var folders = await _context.PieceInfo.Where(p => p.SourceFolder != null && p.SourceFolder != "")
+        var folders = await _context.PieceLookup.Where(p => p.SourceFolder != null && p.SourceFolder != "")
             .Select(p => p.SourceFolder!).Distinct().OrderBy(f => f).ToListAsync();
-        var genres = await _context.PieceInfo.Where(p => p.Genre != null && p.Genre != "")
+        var genres = await _context.PieceLookup.Where(p => p.Genre != null && p.Genre != "")
             .Select(p => p.Genre!).Distinct().OrderBy(g => g).ToListAsync();
-        var totalSongs = await _context.PieceInfo.CountAsync();
+        var totalSongs = await _context.PieceLookup.CountAsync();
         var playlistCount = await _context.List.CountAsync();
         return Json(new { folders, genres, totalSongs, playlistCount });
     }
@@ -103,7 +103,7 @@ public class ExportController : Controller
         var musicDir = Path.Combine(exportDir, "Music");
 
         // Step 1: Get all song IDs with their folders
-        var songs = await _context.PieceInfo
+        var songs = await _context.PieceLookup
             .Select(p => new { p.PieceId, p.SourceFolder })
             .ToListAsync();
 
@@ -125,7 +125,7 @@ public class ExportController : Controller
     public async Task<IActionResult> ExportFolder(string folder)
     {
         var exportDir = Path.Combine(Path.GetTempPath(), $"pig_folder_{Guid.NewGuid()}");
-        var songIds = await _context.PieceInfo
+        var songIds = await _context.PieceLookup
             .Where(p => p.SourceFolder == folder)
             .Select(p => p.PieceId).ToListAsync();
 
@@ -139,7 +139,7 @@ public class ExportController : Controller
     public async Task<IActionResult> ExportGenre(string genre)
     {
         var exportDir = Path.Combine(Path.GetTempPath(), $"pig_genre_{Guid.NewGuid()}");
-        var songIds = await _context.PieceInfo
+        var songIds = await _context.PieceLookup
             .Where(p => p.Genre == genre)
             .Select(p => p.PieceId).ToListAsync();
 
@@ -154,7 +154,7 @@ public class ExportController : Controller
     {
         var exportDir = Path.Combine(Path.GetTempPath(), $"pig_artist_{Guid.NewGuid()}");
         var safeName = string.Join("_", artist.Split(Path.GetInvalidFileNameChars()));
-        var songIds = await _context.PieceInfo
+        var songIds = await _context.PieceLookup
             .Where(p => p.Artist == artist)
             .Select(p => p.PieceId).ToListAsync();
 
@@ -181,10 +181,10 @@ public class ExportController : Controller
 
         foreach (var pl in playlists)
         {
-            var resolvedHashes = await PlaylistResolver.ResolveAudioHashes(_context, pl.ListId);
+            var resolvedPieceIds = await PlaylistResolver.ResolvePieceIds(_context, new List<int> { pl.ListId });
 
-            var songs = await _context.PieceInfo
-                .Where(p => resolvedHashes.Contains(p.AudioHash))
+            var songs = await _context.PieceLookup
+                .Where(p => resolvedPieceIds.Contains(p.PieceId))
                 .OrderBy(p => p.Artist).ThenBy(p => p.Title)
                 .Select(p => new { p.FileName, p.SourceFolder, p.Seconds, p.Artist, p.Title })
                 .ToListAsync();

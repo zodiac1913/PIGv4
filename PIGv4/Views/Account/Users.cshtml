@@ -1,0 +1,46 @@
+@model List<PIGv4.Models.AppUser>
+@{
+    ViewData["Title"] = "User Management";
+}
+<nav class="navbar navbar-expand-sm border-bottom box-shadow rounded-4" style="background-color: Maroon">
+    <div class="container-fluid">
+        <div class="navbar-brand" style="color: HotPink;">User Management</div>
+    </div>
+</nav>
+<div class="mt-3">
+    <table class="table table-sm table-striped table-hover">
+        <thead class="table-dark">
+            <tr><th>Username</th><th>Display Name</th><th>Role</th><th>Approved</th><th>Active</th><th>Last Login</th><th></th></tr>
+        </thead>
+        <tbody>
+        @foreach (var u in Model)
+        {
+            <tr>
+                <td>@u.Username</td>
+                <td>@u.DisplayName</td>
+                <td>@u.Role</td>
+                <td>@(u.IsApproved ? "✓" : "Pending")</td>
+                <td>@(u.IsActive ? "✓" : "✗")</td>
+                <td>@u.LastLogin?.ToString("g")</td>
+                <td>
+                    @if (!u.IsApproved)
+                    {
+                        <form method="post" asp-action="ApproveUser" asp-route-id="@u.AppUserId" class="d-inline">
+                            <button class="btn btn-sm btn-success">Approve</button>
+                        </form>
+                        <form method="post" asp-action="RejectUser" asp-route-id="@u.AppUserId" class="d-inline">
+                            <button class="btn btn-sm btn-danger">Reject</button>
+                        </form>
+                    }
+                    @if (u.Role != "Admin")
+                    {
+                        <form method="post" asp-action="ToggleActive" asp-route-id="@u.AppUserId" class="d-inline">
+                            <button class="btn btn-sm btn-outline-warning">@(u.IsActive ? "Deactivate" : "Activate")</button>
+                        </form>
+                    }
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+</div>

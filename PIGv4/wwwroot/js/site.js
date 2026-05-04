@@ -33,7 +33,7 @@ document.addEventListener('DOMContentLoaded', function () {
         // Skip external links, hash links, modals, and non-navigation links
         if (!href || href.startsWith('#') || href.startsWith('javascript:')
             || href.startsWith('http') || link.target === '_blank'
-            || link.dataset.bsToggle || link.id === 'playerToggleBtn') return;
+            || link.dataset.bsToggle) return;
 
         // Skip if it's not a navpig-link or navbar-brand (only intercept main nav)
         if (!link.classList.contains('navpig-link') && !link.classList.contains('navbar-brand')
@@ -78,6 +78,14 @@ async function ajaxNavigate(url) {
                 oldScript.parentNode.replaceChild(newScript, oldScript);
                 if (!oldScript.src) resolve();
             });
+        }
+
+        // Re-populate home page player filters after AJAX navigation
+        if (typeof pigPlayer !== 'undefined' && document.getElementById('homeFilterGenPlaylists')) {
+            pigPlayer.loadFilters();
+            pigPlayer.updateShuffleRepeatButtons();
+            pigPlayer.updateButtons(!pigPlayer.audio.paused);
+            pigPlayer.updateProgress();
         }
     } catch (err) {
         window.location.href = url;

@@ -49,10 +49,10 @@ public class PlayListsController : Controller
             .Where(lf => lf.ListId == id)
             .ToListAsync();
 
-        // Resolve full playlist: direct title matches + all songs by flagged artists
-        var resolvedHashes = await PlaylistResolver.ResolveAudioHashes(_context, id);
-        var pieces = await _context.PieceInfo
-            .Where(p => resolvedHashes.Contains(p.AudioHash))
+        // Resolve full playlist using cached PieceIds — instant lookup
+        var resolvedPieceIds = await PlaylistResolver.ResolvePieceIds(_context, new List<int> { id });
+        var pieces = await _context.PieceLookup
+            .Where(p => resolvedPieceIds.Contains(p.PieceId))
             .OrderBy(p => p.Artist).ThenBy(p => p.Title)
             .Select(p => new { p.PieceId, p.AudioHash, p.Artist, p.Title, p.Album, p.Genre, p.Year, p.BPM, p.Seconds })
             .ToListAsync();
@@ -78,6 +78,7 @@ public class PlayListsController : Controller
         if (filter == null) return NotFound();
         _context.ListFilter.Remove(filter);
         await _context.SaveChangesAsync();
+        await PlaylistResolver.RebuildPlaylist(_context, req.ListId);
         return Json(new { success = true });
     }
 
@@ -92,6 +93,7 @@ public class PlayListsController : Controller
         filter.Editor = "PlayLists";
         filter.Edited = DateTime.Now;
         await _context.SaveChangesAsync();
+        await PlaylistResolver.RebuildPlaylist(_context, req.ListId);
         return Json(new { success = true });
     }
 }

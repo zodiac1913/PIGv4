@@ -1,5 +1,7 @@
 html {
   font-size: 14px;
+  position: relative;
+  min-height: 100%;
 }
 
 @media (min-width: 768px) {
@@ -12,29 +14,8 @@ html {
   box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
 }
 
-html {
-  position: relative;
-  min-height: 100%;
-}
-
 body {
   background-color: #FFEEEE;
-  /* background-image: linear-gradient(315deg, #FFEEEE 0%, #DDEFBB 74%);
-  background-image: url('/pics/PIGTranBG.png'); 
-  background-size: cover;
-  background-size: 32% 45%; 
-  background-repeat: no-repeat; 
-  background-attachment: fixed; 
-  background-position: right bottom;   */
-}
-
-.form-floating > .form-control-plaintext::placeholder, .form-floating > .form-control::placeholder {
-  color: var(--bs-secondary-color);
-  text-align: end;
-}
-
-.form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
-  text-align: start;
 }
 
 .navpig-link {
@@ -47,29 +28,13 @@ body {
     text-decoration: underline;
 }
 
-/* Player Sidebar */
-.player-sidebar {
-    position: fixed;
-    top: 56px;
-    right: -320px;
-    width: 320px;
-    height: calc(100vh - 56px);
-    background-color: #1a1a2e;
-    border-left: 2px solid Maroon;
-    z-index: 1040;
-    overflow-y: auto;
-    transition: right 0.3s ease;
+.navpig-link:focus,
+.navpig-link:active,
+.navpig-link.active {
+    color: lawngreen;
 }
 
-.player-sidebar.open {
-    right: 0;
-}
-
-body.sidebar-open .container {
-    margin-right: 320px;
-    transition: margin-right 0.3s ease;
-}
-
+/* ── Filter check lists ─────────────────────────────────────────── */
 .filter-check-list {
     max-height: 150px;
     overflow-y: auto;
@@ -79,7 +44,6 @@ body.sidebar-open .container {
 .filter-check-list label {
     display: block;
     font-size: 0.78rem;
-    color: #bbb;
     cursor: pointer;
     padding: 1px 0;
     white-space: nowrap;
@@ -96,67 +60,6 @@ body.sidebar-open .container {
     accent-color: HotPink;
 }
 
-.song-list {
-    max-height: 200px;
-    overflow-y: auto;
-}
-
-.song-list-item {
-    padding: 4px 6px;
-    border-bottom: 1px solid #2a2a3e;
-    cursor: pointer;
-    color: #ccc;
-    font-size: 0.8rem;
-}
-
-.song-list-item:hover {
-    background-color: #2a2a3e;
-    color: HotPink;
-}
-
-.song-list-item.active {
-    background-color: Maroon;
-    color: HotPink;
-}
-
-.song-list-item .song-title {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.song-list-item .song-artist {
-    font-size: 0.7rem;
-    color: #888;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-/* Seek bar styling */
-#seekBar::-webkit-slider-thumb {
-    background: HotPink;
-}
-
-#seekBar::-webkit-slider-runnable-track {
-    background: #444;
-}
-
-/* Transport button group border */
-.transport-controls {
-    display: inline-block;
-    border: 2px solid goldenrod;
-    border-radius: 20px;
-    padding: 2px 6px;
-}
-
-.transport-controls-wrap {
-    border: 2px solid goldenrod;
-    border-radius: 16px;
-    padding: 8px;
-}
-
-/* Make checkboxes visible */
 .form-check-input {
     border: 2px solid #333;
 }
@@ -166,10 +69,119 @@ body.sidebar-open .container {
     background-color: HotPink;
 }
 
-/* Active nav link - keep visible on dark navbar */
-.navpig-link:focus,
-.navpig-link:active,
-.navpig-link.active {
-    color: lawngreen;
+/* ── Home page player ───────────────────────────────────────────── */
+.pig-logo {
+    border-radius: 50%;
+    max-height: 180px;
+    object-fit: contain;
 }
 
+.home-album-art {
+    max-width: 100px;
+    max-height: 100px;
+    border-radius: 6px;
+    cursor: pointer;
+    box-shadow: 0 0 10px rgba(255,105,180,0.4);
+}
+
+.info-label {
+    color: Maroon;
+    font-weight: bold;
+}
+
+.home-player-bar {
+    border: 2px solid goldenrod;
+    border-radius: 12px;
+}
+
+.player-btn {
+    font-size: 1.1rem;
+    min-width: 42px;
+    min-height: 42px;
+}
+
+/* ── Seek bar styling ───────────────────────────────────────────── */
+#homeSeekBar::-webkit-slider-thumb {
+    background: HotPink;
+}
+
+#homeSeekBar::-webkit-slider-runnable-track {
+    background: #ccc;
+}
+
+/* ── Mobile responsive ──────────────────────────────────────────── */
+@media (max-width: 767.98px) {
+    /* PIG as background watermark on mobile */
+    .home-hero {
+        position: relative;
+        justify-content: center;
+    }
+
+    .pig-logo {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        opacity: 0.12;
+        max-height: 300px;
+        z-index: 0;
+        pointer-events: none;
+    }
+
+    .home-hero > *:not(.pig-logo) {
+        position: relative;
+        z-index: 1;
+    }
+
+    /* Now-playing info stacks vertically */
+    .home-now-playing {
+        flex-direction: column;
+        gap: 2px !important;
+        font-size: 2.2rem !important;
+    }
+
+    /* Big touch-friendly transport buttons */
+    .player-btn {
+        font-size: 1.5rem;
+        min-width: 54px;
+        min-height: 54px;
+        padding: 6px 10px;
+    }
+
+    .player-transport {
+        width: 100%;
+        justify-content: center;
+        margin-bottom: 8px;
+    }
+
+    .player-seek {
+        width: 100%;
+        min-width: 0 !important;
+        margin: 4px 0 !important;
+    }
+
+    .player-volume {
+        width: 100%;
+        justify-content: center;
+        margin-top: 4px;
+    }
+
+    .player-volume input[type="range"] {
+        width: 60% !important;
+    }
+
+    /* Hide album art column on mobile (pig is background) */
+    .home-album-art {
+        max-width: 70px;
+        max-height: 70px;
+    }
+}
+
+/* Small phones */
+@media (max-width: 400px) {
+    .player-btn {
+        font-size: 1.3rem;
+        min-width: 46px;
+        min-height: 46px;
+    }
+}

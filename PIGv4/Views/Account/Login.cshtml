@@ -1,0 +1,45 @@
+@{
+    ViewData["Title"] = "Login";
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PIG v4 - Login</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="icon" type="image/png" href="~/pics/pigiconsnout.png" />
+    <style>body { background-color: #1a1a2e; }</style>
+</head>
+<body>
+<div class="container" style="max-width: 400px; margin-top: 10vh;">
+    <div class="text-center mb-4">
+        <img src="~/pics/pig.png" alt="PIG" style="max-width: 150px; border-radius: 50%;" />
+        <h3 style="color: HotPink;">PIG v4</h3>
+        <small class="text-muted">Playlist Intelligent Generator</small>
+    </div>
+    <div class="card bg-dark text-light">
+        <div class="card-body">
+            @if (ViewBag.Error != null)
+            {
+                <div class="alert alert-danger small">@ViewBag.Error</div>
+            }
+            <form method="post" asp-action="Login">
+                <input type="hidden" name="returnUrl" value="@ViewBag.ReturnUrl" />
+                <div class="mb-3">
+                    <input type="text" name="username" title="Username" class="form-control border-secondary" placeholder="Username" autofocus style="background:#FF8989;" />
+                </div>
+                <div class="mb-3">
+                    <input type="password" name="password" title="Password" class="form-control border-secondary" placeholder="Password" style="background:#FF8989;" />
+                </div>
+                <button type="submit" class="btn w-100" style="background-color: Maroon; color: HotPink;">Login</button>
+            </form>
+            <div class="text-center mt-3">
+                <a href="/Account/Register" style="color: HotPink;">Create an account</a>
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

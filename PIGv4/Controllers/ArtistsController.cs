@@ -16,7 +16,7 @@ public class ArtistsController : Controller
     [HttpGet]
     public async Task<IActionResult> Browse(string? search, string? startsWith, int page = 1, int pageSize = 50)
     {
-        var query = _context.PieceInfo
+        var query = _context.PieceLookup
             .Where(p => p.Artist != null && p.Artist != "");
 
         if (!string.IsNullOrWhiteSpace(startsWith))
@@ -43,19 +43,19 @@ public class ArtistsController : Controller
         if (string.IsNullOrEmpty(name)) return BadRequest();
 
         // Songs by this artist
-        var songs = await _context.PieceInfo
+        var songs = await _context.PieceLookup
             .Where(p => p.Artist == name)
             .OrderBy(p => p.Title)
             .Select(p => new { p.PieceId, p.Title, p.Album, p.Genre, p.Year, p.BPM, p.Seconds })
             .ToListAsync();
 
         // Genres this artist appears in
-        var genres = await _context.PieceInfo
+        var genres = await _context.PieceLookup
             .Where(p => p.Artist == name && p.Genre != null)
             .Select(p => p.Genre!).Distinct().OrderBy(g => g).ToListAsync();
 
         // Gen Playlists this artist is in (via ListFilter HasArtist)
-        var audioHashes = await _context.PieceInfo
+        var audioHashes = await _context.PieceLookup
             .Where(p => p.Artist == name)
             .Select(p => p.AudioHash).Distinct().ToListAsync();
 
@@ -69,7 +69,7 @@ public class ArtistsController : Controller
             .Select(l => l.Title).ToListAsync();
 
         // Find possible duplicates — similar artist names
-        var allArtists = await _context.PieceInfo
+        var allArtists = await _context.PieceLookup
             .Where(p => p.Artist != null && p.Artist != "")
             .Select(p => p.Artist!).Distinct().ToListAsync();
 

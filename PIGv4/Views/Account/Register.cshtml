@@ -1,0 +1,50 @@
+@{
+    ViewData["Title"] = "Register";
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PIG v4 - Register</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="icon" type="image/png" href="~/pics/pigiconsnout.png" />
+    <style>body { background-color: #1a1a2e; }</style>
+</head>
+<body>
+<div class="container" style="max-width: 400px; margin-top: 10vh;">
+    <div class="text-center mb-4">
+        <img src="~/pics/pig.png" alt="PIG" style="max-width: 150px; border-radius: 50%;" />
+        <h3 style="color: HotPink;">PIG v4</h3>
+    </div>
+    <div class="card bg-dark text-light">
+        <div class="card-body">
+            @if (ViewBag.Error != null)
+            {
+                <div class="alert alert-danger small">@ViewBag.Error</div>
+            }
+            @if (ViewBag.Success != null)
+            {
+                <div class="alert alert-success small">@ViewBag.Success</div>
+            }
+            <form method="post" asp-action="Register">
+                <div class="mb-3">
+                    <input type="text" name="username" class="form-control border-secondary" style="background:#FF8989;" placeholder="Username" required />
+                </div>
+                <div class="mb-3">
+                    <input type="password" name="password" class="form-control border-secondary" style="background:#FF8989;" placeholder="Password" required />
+                </div>
+                <div class="mb-3">
+                    <input type="text" name="displayName" class="form-control border-secondary" style="background:#FF8989;" placeholder="Display Name (optional)" />
+                </div>
+                <button type="submit" class="btn w-100" style="background-color: Maroon; color: HotPink;">Register</button>
+            </form>
+            <div class="text-center mt-3">
+                <a href="/Account/Login" style="color: HotPink;">Back to Login</a>
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

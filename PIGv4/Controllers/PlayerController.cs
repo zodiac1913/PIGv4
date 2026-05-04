@@ -32,29 +32,37 @@ public class PlayerController : Controller
         [FromQuery] List<string>? folders,
         [FromQuery] List<int>? listIds,
         string? search,
+        bool all = false,
         int page = 1, int pageSize = 50)
     {
         // Build separate queries for each filter type, then UNION them (OR logic)
-        var queries = new List<IQueryable<PieceInfo>>();
+        var queries = new List<IQueryable<PieceLookup>>();
 
         if (listIds != null && listIds.Count > 0)
         {
-            var allHashes = await PlaylistResolver.ResolveAudioHashes(_context, listIds);
-            queries.Add(_context.PieceInfo.Where(p => allHashes.Contains(p.AudioHash)));
+            var pieceIds = await PlaylistResolver.ResolvePieceIds(_context, listIds);
+            queries.Add(_context.PieceLookup.Where(p => pieceIds.Contains(p.PieceId)));
         }
 
         if (genres != null && genres.Count > 0)
-            queries.Add(_context.PieceInfo.Where(p => p.Genre != null && genres.Contains(p.Genre)));
+            queries.Add(_context.PieceLookup.Where(p => p.Genre != null && genres.Contains(p.Genre)));
         if (artists != null && artists.Count > 0)
-            queries.Add(_context.PieceInfo.Where(p => p.Artist != null && artists.Contains(p.Artist)));
+            queries.Add(_context.PieceLookup.Where(p => p.Artist != null && artists.Contains(p.Artist)));
         if (folders != null && folders.Count > 0)
-            queries.Add(_context.PieceInfo.Where(p => p.SourceFolder != null && folders.Contains(p.SourceFolder)));
+            queries.Add(_context.PieceLookup.Where(p => p.SourceFolder != null && folders.Contains(p.SourceFolder)));
 
-        IQueryable<PieceInfo> query;
+        IQueryable<PieceLookup> query;
         if (queries.Count == 0)
         {
-            // No filters — return empty
-            return Json(new { total = 0, page, pageSize, songs = new List<object>() });
+            if (all)
+            {
+                // No filters but all=true — return all songs
+                query = _context.PieceLookup;
+            }
+            else
+            {
+                return Json(new { total = 0, page, pageSize, songs = new List<object>() });
+            }
         }
         else if (queries.Count == 1)
         {
@@ -92,11 +100,32 @@ public class PlayerController : Controller
         return Json(new { total, page, pageSize, songs });
     }
 
+    /// <summary>Get a single random song (fast — uses PieceHashLookup, no blob scan).</summary>
+    [HttpGet]
+    public async Task<IActionResult> RandomSong()
+    {
+        var count = await _context.PieceLookup.CountAsync();
+        if (count == 0) return Json(new { song = (object?)null });
+
+        var skip = new Random().Next(count);
+        var song = await _context.PieceLookup
+            .OrderBy(p => p.PieceId)
+            .Skip(skip).Take(1)
+            .Select(p => new
+            {
+                p.PieceId, p.Title, p.Artist, p.Album, p.Genre,
+                p.Year, p.BPM, p.Seconds, p.SourceFolder
+            })
+            .FirstOrDefaultAsync();
+
+        return Json(new { song });
+    }
+
     /// <summary>Get a single song by PieceId (for picked songs).</summary>
     [HttpGet]
     public async Task<IActionResult> BrowseById(int id)
     {
-        var song = await _context.PieceInfo
+        var song = await _context.PieceLookup
             .Where(p => p.PieceId == id)
             .Select(p => new
             {
@@ -254,7 +283,7 @@ public class PlayerController : Controller
     {
         if (type == "folders")
         {
-            var fQuery = _context.PieceInfo.Where(p => p.SourceFolder != null);
+            var fQuery = _context.PieceLookup.Where(p => p.SourceFolder != null);
             if (!IsChristmasSeason())
                 fQuery = fQuery.Where(p => p.SourceFolder != "Christmas");
             var folders = await fQuery.Select(p => p.SourceFolder!).Distinct().OrderBy(f => f).ToListAsync();
@@ -262,13 +291,13 @@ public class PlayerController : Controller
         }
         if (type == "genres")
         {
-            var genres = await _context.PieceInfo.Where(p => p.Genre != null)
+            var genres = await _context.PieceLookup.Where(p => p.Genre != null)
                 .Select(p => p.Genre!).Distinct().OrderBy(g => g).ToListAsync();
             return Json(genres);
         }
         if (type == "artists")
         {
-            var artists = await _context.PieceInfo.Where(p => p.Artist != null)
+            var artists = await _context.PieceLookup.Where(p => p.Artist != null)
                 .Select(p => p.Artist!).Distinct().OrderBy(a => a).ToListAsync();
             return Json(artists);
         }
@@ -285,11 +314,11 @@ public class PlayerController : Controller
         }
 
         // Legacy: return all at once
-        var allGenres = await _context.PieceInfo.Where(p => p.Genre != null)
+        var allGenres = await _context.PieceLookup.Where(p => p.Genre != null)
             .Select(p => p.Genre!).Distinct().OrderBy(g => g).ToListAsync();
-        var allArtists = await _context.PieceInfo.Where(p => p.Artist != null)
+        var allArtists = await _context.PieceLookup.Where(p => p.Artist != null)
             .Select(p => p.Artist!).Distinct().OrderBy(a => a).ToListAsync();
-        var allFolders = await _context.PieceInfo.Where(p => p.SourceFolder != null)
+        var allFolders = await _context.PieceLookup.Where(p => p.SourceFolder != null)
             .Select(p => p.SourceFolder!).Distinct().OrderBy(f => f).ToListAsync();
 
         return Json(new { genres = allGenres, artists = allArtists, folders = allFolders });

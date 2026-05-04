@@ -1,14 +1,31 @@
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
 using PIGv4.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-builder.Services.AddControllersWithViews();
+builder.Services.AddControllersWithViews(options =>
+{
+    // Require authentication on all controllers by default
+    var policy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser().Build();
+    options.Filters.Add(new Microsoft.AspNetCore.Mvc.Authorization.AuthorizeFilter(policy));
+});
 
 // Add Entity Framework
 builder.Services.AddDbContext<PigContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+// Add cookie authentication
+builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(options =>
+    {
+        options.LoginPath = "/Account/Login";
+        options.LogoutPath = "/Account/Logout";
+        options.ExpireTimeSpan = TimeSpan.FromDays(30);
+        options.SlidingExpiration = true;
+    });
 
 var app = builder.Build();
 
@@ -45,12 +62,19 @@ using (var scope = app.Services.CreateScope())
         "CREATE INDEX IF NOT EXISTS IX_Piece_IsNew ON Piece(IsNew);",
         "CREATE INDEX IF NOT EXISTS IX_Piece_FileName ON Piece(FileName);",
         "CREATE INDEX IF NOT EXISTS IX_Piece_Artist_Title ON Piece(Artist, Title);",
-        "CREATE INDEX IF NOT EXISTS IX_ListFilter_ListId ON ListFilter(ListId);"
+        "CREATE INDEX IF NOT EXISTS IX_ListFilter_ListId ON ListFilter(ListId);",
+        // Composite indexes for fast playlist resolution
+        "CREATE INDEX IF NOT EXISTS IX_ListFilter_ListId_HasTitle ON ListFilter(ListId, HasTitle, AudioHash);",
+        "CREATE INDEX IF NOT EXISTS IX_ListFilter_ListId_HasArtist ON ListFilter(ListId, HasArtist, AudioHash);",
+        "CREATE INDEX IF NOT EXISTS IX_Piece_AudioHash_Artist ON Piece(AudioHash, Artist);"
     };
     foreach (var sql in indexes)
     {
         try { db.Database.ExecuteSqlRaw(sql); } catch { }
     }
+
+    // Build the PlaylistSong cache (denormalized ListId→PieceId for instant playlist queries)
+    try { await PlaylistResolver.RebuildAll(db); } catch (Exception ex) { Console.WriteLine("PlaylistSong cache rebuild failed: " + ex.Message); }
 }
 
 // Configure the HTTP request pipeline.
@@ -64,6 +88,7 @@ if (!app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 app.UseRouting();
 
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapStaticAssets();
