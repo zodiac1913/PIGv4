@@ -17,6 +17,7 @@ public class PigContext : DbContext
     public DbSet<ImportError> ImportError { get; set; }
     public DbSet<Log> Log { get; set; }
     public DbSet<AppUser> AppUser { get; set; }
+    public DbSet<ApiToken> ApiToken { get; set; }
     
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -33,6 +34,8 @@ public class PigContext : DbContext
         modelBuilder.Entity<Log>().HasKey(l => l.LogIdentifier);
         modelBuilder.Entity<AppUser>().HasKey(u => u.AppUserId);
         modelBuilder.Entity<AppUser>().HasIndex(u => u.Username).IsUnique();
+        modelBuilder.Entity<ApiToken>().HasKey(t => t.ApiTokenId);
+        modelBuilder.Entity<ApiToken>().HasIndex(t => t.Token).IsUnique();
         
         // Index AudioHash on Piece for fast lookups and dedup
         modelBuilder.Entity<Piece>()

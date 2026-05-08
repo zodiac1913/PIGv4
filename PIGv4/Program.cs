@@ -66,7 +66,10 @@ using (var scope = app.Services.CreateScope())
         // Composite indexes for fast playlist resolution
         "CREATE INDEX IF NOT EXISTS IX_ListFilter_ListId_HasTitle ON ListFilter(ListId, HasTitle, AudioHash);",
         "CREATE INDEX IF NOT EXISTS IX_ListFilter_ListId_HasArtist ON ListFilter(ListId, HasArtist, AudioHash);",
-        "CREATE INDEX IF NOT EXISTS IX_Piece_AudioHash_Artist ON Piece(AudioHash, Artist);"
+        "CREATE INDEX IF NOT EXISTS IX_Piece_AudioHash_Artist ON Piece(AudioHash, Artist);",
+        // ApiToken table
+        "CREATE TABLE IF NOT EXISTS ApiToken (ApiTokenId INTEGER PRIMARY KEY AUTOINCREMENT, AppUserId INTEGER NOT NULL, Token TEXT NOT NULL, DeviceName TEXT, Created TEXT NOT NULL DEFAULT (datetime('now')), LastUsed TEXT, IsActive INTEGER NOT NULL DEFAULT 1);",
+        "CREATE UNIQUE INDEX IF NOT EXISTS IX_ApiToken_Token ON ApiToken(Token);"
     };
     foreach (var sql in indexes)
     {
@@ -89,6 +92,7 @@ app.UseHttpsRedirection();
 app.UseRouting();
 
 app.UseAuthentication();
+app.UseMiddleware<PIGv4.Models.ApiTokenAuthMiddleware>();
 app.UseAuthorization();
 
 app.MapStaticAssets();

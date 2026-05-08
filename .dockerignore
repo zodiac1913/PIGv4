@@ -1,0 +1,8 @@
+**/.git
+**/bin
+**/obj
+**/node_modules
+**/.vs
+**/.vscode
+**/PIGv4-data
+*.db

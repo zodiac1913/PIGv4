@@ -1,0 +1,8 @@
+services:
+  pig:
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./PIGv4-data:/data
+    restart: unless-stopped
