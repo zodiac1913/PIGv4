@@ -105,42 +105,53 @@ public class SongsController : Controller
     [HttpPost]
     public async Task<IActionResult> SaveTags([FromBody] SaveTagsRequest req)
     {
-        var piece = await _context.Piece.FindAsync(req.PieceId);
-        if (piece == null) return NotFound();
-
-        piece.Title = req.Title?.Trim();
-        piece.Artist = req.Artist?.Trim();
-        piece.Album = req.Album?.Trim();
-        piece.Genre = req.Genre?.Trim();
-        piece.Year = req.Year;
-        piece.BPM = req.BPM;
-        piece.Editor = "Songs";
-        piece.Edited = DateTime.Now;
-
-        // Write tags into the MP3 blob
-        if (piece.Mp3 != null)
+        try
         {
-            try
-            {
-                var tempPath = Path.Combine(Path.GetTempPath(), piece.FileName);
-                await System.IO.File.WriteAllBytesAsync(tempPath, piece.Mp3);
-                using var tagFile = TagLib.File.Create(tempPath);
-                tagFile.Tag.Title = piece.Title;
-                tagFile.Tag.Performers = piece.Artist != null ? new[] { piece.Artist } : Array.Empty<string>();
-                tagFile.Tag.Album = piece.Album;
-                tagFile.Tag.Genres = piece.Genre != null ? new[] { piece.Genre } : Array.Empty<string>();
-                tagFile.Tag.Year = piece.Year.HasValue ? (uint)piece.Year.Value : 0;
-                tagFile.Tag.BeatsPerMinute = piece.BPM.HasValue ? (uint)piece.BPM.Value : 0;
-                tagFile.Save();
-                piece.Mp3 = await System.IO.File.ReadAllBytesAsync(tempPath);
-                System.IO.File.Delete(tempPath);
-            }
-            catch { }
-        }
+            var piece = await _context.Piece.FindAsync(req.PieceId);
+            if (piece == null) return NotFound();
 
-        await _context.SaveChangesAsync();
-        await PlaylistResolver.UpdateLookup(_context, piece);
-        return Json(new { success = true });
+            piece.Title = req.Title?.Trim();
+            piece.Artist = req.Artist?.Trim();
+            piece.Album = req.Album?.Trim();
+            piece.Genre = req.Genre?.Trim();
+            piece.Year = req.Year;
+            piece.BPM = req.BPM;
+            piece.Editor = "Songs";
+            piece.Edited = DateTime.Now;
+
+            // Write tags into the MP3 blob
+            if (piece.Mp3 != null && !string.IsNullOrEmpty(piece.FileName))
+            {
+                try
+                {
+                    var tempPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + "_" + piece.FileName);
+                    await System.IO.File.WriteAllBytesAsync(tempPath, piece.Mp3);
+                    using var tagFile = TagLib.File.Create(tempPath);
+                    tagFile.Tag.Title = piece.Title;
+                    tagFile.Tag.Performers = piece.Artist != null ? new[] { piece.Artist } : Array.Empty<string>();
+                    tagFile.Tag.Album = piece.Album;
+                    tagFile.Tag.Genres = piece.Genre != null ? new[] { piece.Genre } : Array.Empty<string>();
+                    tagFile.Tag.Year = piece.Year.HasValue ? (uint)piece.Year.Value : 0;
+                    tagFile.Tag.BeatsPerMinute = piece.BPM.HasValue ? (uint)piece.BPM.Value : 0;
+                    tagFile.Save();
+                    piece.Mp3 = await System.IO.File.ReadAllBytesAsync(tempPath);
+                    System.IO.File.Delete(tempPath);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"TagLib write failed for PieceId {req.PieceId}: {ex.Message}");
+                }
+            }
+
+            await _context.SaveChangesAsync();
+            await PlaylistResolver.UpdateLookup(_context, piece);
+            return Json(new { success = true });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"SaveTags failed for PieceId {req.PieceId}: {ex}");
+            return StatusCode(500, new { error = ex.Message });
+        }
     }
 
     /// <summary>Save playlist filter assignments for a song and mark it as not new.</summary>

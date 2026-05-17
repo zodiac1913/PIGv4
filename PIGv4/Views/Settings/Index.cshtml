@@ -39,7 +39,7 @@
 </div>
 
 <script>
-const settingsPage = {
+var settingsPage = {
     async init() {
         var resp = await fetch('/Settings/DbInfo');
         var info = await resp.json();

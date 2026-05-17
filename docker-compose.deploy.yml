@@ -1,6 +1,5 @@
 services:
   pig:
-    build: .
     image: pigv4:latest
     ports:
       - "42206:8080"

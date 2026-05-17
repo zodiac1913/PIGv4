@@ -93,42 +93,47 @@ public static class PlaylistResolver
 
     /// <summary>
     /// Populate PieceLookup from Piece if empty. One-time cost on first boot.
+    /// Also syncs any Piece rows missing from PieceLookup (e.g. after failed imports).
     /// </summary>
     public static async Task RefreshLookup(PigContext context)
     {
-        using var cmd = context.Database.GetDbConnection().CreateCommand();
-        cmd.CommandText = "SELECT COUNT(*) FROM PieceLookup";
         await context.Database.OpenConnectionAsync();
-        var existing = Convert.ToInt64(await cmd.ExecuteScalarAsync());
-        if (existing > 0) return;
-
+        
+        // Always sync missing entries
         await context.Database.ExecuteSqlRawAsync(@"
-            INSERT INTO PieceLookup (PieceId, AudioHash, Artist, Title, Album, Genre, Year, BPM, Seconds, SourceFolder, FileName, FileSize, IsNew, AlbumArtUrl, AlbumArtChecked)
-            SELECT PieceId, AudioHash, Artist, Title, Album, Genre, Year, BPM, Seconds, SourceFolder, FileName, FileSize, IsNew, AlbumArtUrl, AlbumArtChecked
-            FROM Piece");
+            INSERT OR IGNORE INTO PieceLookup (PieceId, AudioHash, Artist, Title, Album, Genre, Year, BPM, Seconds, SourceFolder, FileName, FileSize, IsNew, AlbumArtUrl, AlbumArtChecked)
+            SELECT PieceId, AudioHash, COALESCE(Artist,''), COALESCE(Title,''), COALESCE(Album,''), COALESCE(Genre,''), COALESCE(Year,0), COALESCE(BPM,0), COALESCE(Seconds,0), COALESCE(SourceFolder,''), FileName, COALESCE(FileSize,0), IsNew, COALESCE(AlbumArtUrl,''), AlbumArtChecked
+            FROM Piece
+            WHERE PieceId NOT IN (SELECT PieceId FROM PieceLookup)");
     }
 
     /// <summary>Add or update a single song in the lookup. Call after import or tag edit.</summary>
     public static async Task UpdateLookup(PigContext context, Piece piece)
     {
         await EnsureTables(context);
+        
+        // Use parameterized approach that EF Core can handle (no DBNull)
+        var existing = await context.Database.ExecuteSqlRawAsync(
+            "DELETE FROM PieceLookup WHERE PieceId = {0}", piece.PieceId);
+        
         await context.Database.ExecuteSqlRawAsync(@"
-            INSERT OR REPLACE INTO PieceLookup 
+            INSERT INTO PieceLookup 
             (PieceId, AudioHash, Artist, Title, Album, Genre, Year, BPM, Seconds, SourceFolder, FileName, FileSize, IsNew, AlbumArtUrl, AlbumArtChecked)
             VALUES ({0},{1},{2},{3},{4},{5},{6},{7},{8},{9},{10},{11},{12},{13},{14})",
-            piece.PieceId, piece.AudioHash,
-            piece.Artist ?? (object)DBNull.Value,
-            piece.Title ?? (object)DBNull.Value,
-            piece.Album ?? (object)DBNull.Value,
-            piece.Genre ?? (object)DBNull.Value,
-            piece.Year.HasValue ? piece.Year.Value : DBNull.Value,
-            piece.BPM.HasValue ? piece.BPM.Value : DBNull.Value,
-            piece.Seconds.HasValue ? piece.Seconds.Value : DBNull.Value,
-            piece.SourceFolder ?? (object)DBNull.Value,
+            piece.PieceId,
+            piece.AudioHash,
+            piece.Artist ?? (object)"",
+            piece.Title ?? (object)"",
+            piece.Album ?? (object)"",
+            piece.Genre ?? (object)"",
+            piece.Year ?? (object)0,
+            piece.BPM ?? (object)0,
+            piece.Seconds ?? (object)0,
+            piece.SourceFolder ?? (object)"",
             piece.FileName,
-            piece.FileSize.HasValue ? piece.FileSize.Value : DBNull.Value,
+            piece.FileSize ?? (object)0,
             piece.IsNew ? 1 : 0,
-            piece.AlbumArtUrl ?? (object)DBNull.Value,
+            piece.AlbumArtUrl ?? (object)"",
             piece.AlbumArtChecked ? 1 : 0);
     }
 

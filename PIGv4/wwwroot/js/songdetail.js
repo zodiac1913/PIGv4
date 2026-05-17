@@ -1,5 +1,5 @@
 // Shared Song Detail Module — reusable from Songs, Artists, Gen Playlists
-const songDetail = {
+var songDetail = {
     _containerId: null,
     _onBack: null,
 

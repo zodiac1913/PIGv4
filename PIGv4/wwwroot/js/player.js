@@ -1,5 +1,5 @@
 // PIG Music Player — Home Page Edition
-const pigPlayer = {
+var pigPlayer = {
     audio: null,
     playlist: [],
     currentIndex: -1,

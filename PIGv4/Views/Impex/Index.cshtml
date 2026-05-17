@@ -20,7 +20,7 @@
 </nav>
 
 <!-- Import Modal -->
-<div class="modal fade" id="importModal" tabindex="-1" aria-labelledby="importModalLabel" aria-hidden="true">
+<div class="modal fade" id="importModal" aria-labelledby="importModalLabel">
     <div class="modal-dialog modal-xl">
         <div class="modal-content bg-dark text-light">
             <div class="modal-header" style="background-color: Maroon;">
@@ -41,17 +41,25 @@
                 <!-- Hard Drive import panel -->
                 <div id="hardDrivePanel">
                     <input type="file" id="folderPicker" webkitdirectory directory multiple
-                           style="display:none;" />
+                           style="display:none;" accept=".mp3" />
+                    <input type="file" id="filePicker" multiple
+                           style="display:none;" accept=".mp3" />
                     <div class="input-group mb-3">
                         <input type="text" id="folderPath" class="form-control" readonly
-                               placeholder="Click Browse to select a folder..." />
+                               placeholder="Click Browse to select a folder (or files)..." />
                         <button type="button" id="browseBtn" class="btn btn-outline-light">
-                            <i class="bi bi-folder2-open"></i> Browse
+                            <i class="bi bi-folder2-open"></i> Browse Folder
+                        </button>
+                        <button type="button" id="browseFilesBtn" class="btn btn-outline-light">
+                            <i class="bi bi-file-earmark-music"></i> Browse Files
                         </button>
                         <button type="button" id="scanBtn" class="btn btn-outline-light" style="background-color: Maroon;" disabled>
                             <i class="bi bi-download"></i> Scan &amp; Import
                         </button>
                     </div>
+                    <small id="browseHint" class="text-muted" style="display:none;">
+                        Folder selection not supported in this browser. Use "Browse Files" to select MP3s individually.
+                    </small>
                 </div>
 
                 <!-- Status messages -->
@@ -123,17 +131,34 @@
 
 @section Scripts {
 <script>
-    const folderPicker = document.getElementById('folderPicker');
-    const folderPathInput = document.getElementById('folderPath');
-    const scanBtn = document.getElementById('scanBtn');
-    let selectedFiles = [];
+    var folderPicker = document.getElementById('folderPicker');
+    var filePicker = document.getElementById('filePicker');
+    var folderPathInput = document.getElementById('folderPath');
+    var scanBtn = document.getElementById('scanBtn');
+    var selectedFiles = [];
 
-    document.getElementById('browseBtn').addEventListener('click', () => folderPicker.click());
+    // Detect if webkitdirectory is supported
+    var folderSupported = 'webkitdirectory' in document.createElement('input');
+    if (!folderSupported) {
+        document.getElementById('browseBtn').style.display = 'none';
+        document.getElementById('browseHint').style.display = 'block';
+    }
+
+    document.getElementById('browseBtn').addEventListener('click', function() { folderPicker.click(); });
+    document.getElementById('browseFilesBtn').addEventListener('click', function() { filePicker.click(); });
 
     folderPicker.addEventListener('change', function () {
-        selectedFiles = Array.from(this.files).filter(f => f.name.toLowerCase().endsWith('.mp3'));
+        handleFileSelection(this.files);
+    });
+
+    filePicker.addEventListener('change', function () {
+        handleFileSelection(this.files);
+    });
+
+    function handleFileSelection(files) {
+        selectedFiles = Array.from(files).filter(f => f.name.toLowerCase().endsWith('.mp3'));
         if (selectedFiles.length === 0) {
-            showStatus('No MP3 files found in the selected folder.', 'warning');
+            showStatus('No MP3 files found in the selection.', 'warning');
             folderPathInput.value = '';
             scanBtn.disabled = true;
             return;
@@ -141,7 +166,7 @@
         folderPathInput.value = selectedFiles.length + ' MP3 file(s) selected';
         scanBtn.disabled = false;
         document.getElementById('importStatus').style.display = 'none';
-    });
+    }
 
     scanBtn.addEventListener('click', async function () {
         if (selectedFiles.length === 0) { showStatus('Please select a folder first.', 'warning'); return; }

@@ -4,5 +4,18 @@
 **/node_modules
 **/.vs
 **/.vscode
-**/PIGv4-data
+PIGv4-data/
 *.db
+*.db-shm
+*.db-wal
+keys/
+docker-compose.yml
+Dockerfile
+README.md
+LICENSE
+.gitignore
+.gitattributes
+
+# Ensure the project source is never excluded
+!PIGv4/
+!PIGv4/**

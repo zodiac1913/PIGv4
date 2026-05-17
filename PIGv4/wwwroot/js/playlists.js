@@ -1,4 +1,4 @@
-const plPage = {
+var plPage = {
     searchTimer: null,
     currentPage: 1,
     totalPages: 1,

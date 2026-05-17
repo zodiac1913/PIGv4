@@ -4,9 +4,9 @@ EXPOSE 8080
 
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
-COPY PIGv4/PIGv4.csproj PIGv4/
+COPY . .
+RUN test -f PIGv4/PIGv4.csproj || (echo "ERROR: PIGv4/PIGv4.csproj not found in build context. Make sure you are building from the repo root and .dockerignore is not excluding the PIGv4/ directory." && exit 1)
 RUN dotnet restore PIGv4/PIGv4.csproj
-COPY PIGv4/ PIGv4/
 RUN dotnet publish PIGv4/PIGv4.csproj -c Release -o /app/publish
 
 FROM base AS final
