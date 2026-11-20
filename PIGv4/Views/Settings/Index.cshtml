@@ -55,6 +55,7 @@ var settingsPage = {
 
         // Trigger download via hidden iframe
         var iframe = document.createElement('iframe');
+        iframe.title = 'Database backup download';
         iframe.style.display = 'none';
         iframe.src = '/Settings/ExportDb';
         document.body.appendChild(iframe);

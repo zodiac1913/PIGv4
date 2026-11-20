@@ -9,14 +9,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>PIG v4 - Register</title>
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/catsStrap.css" asp-append-version="true" />
     <link rel="icon" type="image/png" href="~/pics/pigiconsnout.png" />
     <style>body { background-color: #1a1a2e; }</style>
 </head>
 <body>
-<div class="container" style="max-width: 400px; margin-top: 10vh;">
+<a href="#maincontent" class="visually-hidden-focusable">Skip to main content</a>
+<main id="maincontent" class="container" style="max-width: 400px; margin-top: 10vh;">
     <div class="text-center mb-4">
         <img src="~/pics/pig.png" alt="PIG" style="max-width: 150px; border-radius: 50%;" />
-        <h3 style="color: HotPink;">PIG v4</h3>
+        <h1 class="h3" style="color: HotPink;">PIG v4</h1>
     </div>
     <div class="card bg-dark text-light">
         <div class="card-body">
@@ -28,7 +30,7 @@
             {
                 <div class="alert alert-success small">@ViewBag.Success</div>
             }
-            <form method="post" asp-action="Register">
+            <form method="post" asp-action="Register" aria-label="Create an account">
                 <div class="mb-3">
                     <input type="text" name="username" class="form-control border-secondary" style="background:#FF8989;" placeholder="Username" required />
                 </div>
@@ -38,13 +40,13 @@
                 <div class="mb-3">
                     <input type="text" name="displayName" class="form-control border-secondary" style="background:#FF8989;" placeholder="Display Name (optional)" />
                 </div>
-                <button type="submit" class="btn w-100" style="background-color: Maroon; color: HotPink;">Register</button>
+                <button type="submit" class="btn btn-Maroon w-100">Register</button>
             </form>
-            <div class="text-center mt-3">
+            <nav class="text-center mt-3" aria-label="Account">
                 <a href="/Account/Login" style="color: HotPink;">Back to Login</a>
-            </div>
+            </nav>
         </div>
     </div>
-</div>
+</main>
 </body>
 </html>

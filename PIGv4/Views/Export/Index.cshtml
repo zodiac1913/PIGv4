@@ -128,7 +128,7 @@ var exportPage = {
     startExport(url, label) {
         var ind = document.getElementById('backupIndicator');
         if (ind) ind.style.setProperty('display','flex','important');
-        var iframe = document.createElement('iframe'); iframe.style.display='none'; iframe.src=url; document.body.appendChild(iframe);
+        var iframe = document.createElement('iframe'); iframe.title='Export download'; iframe.style.display='none'; iframe.src=url; document.body.appendChild(iframe);
         this.showStatus('<span class="spinner-border spinner-border-sm"></span> '+label+' in progress... <button class="btn btn-sm btn-outline-success ms-2" onclick="exportPage.exportDone()">Done</button>','info');
     },
     exportDone() {

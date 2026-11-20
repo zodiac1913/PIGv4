@@ -8,11 +8,13 @@
     <title>@ViewData["Title"] - PIG v4.0</title>
     <script type="importmap"></script>
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/catsStrap.css" asp-append-version="true" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/PIGv4.styles.css" asp-append-version="true" />
 </head>
 <body>
+    <a href="#maincontent" class="visually-hidden-focusable">Skip to main content</a>
     <header>
         <nav class="navbar navbar-expand-sm navbar-toggleable-sm border-bottom box-shadow" style="background-color: Navy;">
             <div class="container-fluid">
@@ -73,7 +75,7 @@
         </nav>
     </header>
     <div class="container">
-        <main role="main" class="pb-3">
+        <main id="maincontent" class="pb-3">
             @RenderBody()
         </main>
     </div>
