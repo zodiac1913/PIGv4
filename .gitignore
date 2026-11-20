@@ -23,3 +23,5 @@ Thumbs.db
 # Temp files
 *.tmp
 *.swp
+# ASP.NET DataProtection keys (secrets, mounted into the container)
+keys/
