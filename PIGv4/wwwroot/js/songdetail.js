@@ -22,9 +22,9 @@ var songDetail = {
             + this.field('Album', 'sd_album', 'text')
             + this.field('Genre', 'sd_genre', 'text')
             + '<div class="mb-2 row">'
-            + '<label class="col-sm-3 col-form-label col-form-label-sm">Year</label>'
+            + '<label for="sd_year" class="col-sm-3 col-form-label col-form-label-sm">Year</label>'
             + '<div class="col-sm-4"><input type="number" id="sd_year" class="form-control form-control-sm" /></div>'
-            + '<label class="col-sm-2 col-form-label col-form-label-sm">BPM</label>'
+            + '<label for="sd_bpm" class="col-sm-2 col-form-label col-form-label-sm">BPM</label>'
             + '<div class="col-sm-3"><input type="number" id="sd_bpm" class="form-control form-control-sm" /></div></div>'
             + '<div class="mb-2 row">'
             + '<label class="col-sm-3 col-form-label col-form-label-sm">Duration</label>'
@@ -33,6 +33,20 @@ var songDetail = {
             + '<div class="col-sm-3"><span id="sd_folder" class="form-control-plaintext form-control-sm"></span></div></div>'
             + '<button class="btn btn-sm btn-success" onclick="songDetail.saveTags()"><i class="bi bi-check-lg"></i> Save Tags</button>'
             + ' <span id="sd_tagStatus" class="ms-2 small"></span>'
+            + '<hr />'
+            + '<h2 class="h6">Album art</h2>'
+            + '<div class="d-flex align-items-start mb-2">'
+            + '<img id="sd_artPreview" src="" alt="" class="me-2" style="max-width:100px;max-height:100px;border-radius:6px;display:none;" />'
+            + '<span id="sd_artNone" class="small text-muted">No album art</span></div>'
+            + '<label for="sd_artUrl" class="form-label form-label-sm small mb-1">Image URL (https)</label>'
+            + '<div class="input-group input-group-sm mb-2">'
+            + '<input type="url" id="sd_artUrl" class="form-control" placeholder="https://..." />'
+            + '<button class="btn btn-outline-success" type="button" onclick="songDetail.saveArtUrl()">Use URL</button></div>'
+            + '<label for="sd_artFile" class="form-label form-label-sm small mb-1">Or upload an image (saved into the MP3)</label>'
+            + '<div class="input-group input-group-sm mb-1">'
+            + '<input type="file" id="sd_artFile" class="form-control" accept="image/jpeg,image/png" />'
+            + '<button class="btn btn-outline-success" type="button" onclick="songDetail.uploadArt()">Upload</button></div>'
+            + '<span id="sd_artStatus" class="small" role="status"></span>'
             + '</div></div></div>'
             + '<div class="col-md-7"><div class="card">'
             + '<div class="card-header d-flex justify-content-between" style="background-color:Maroon;color:HotPink;">'
@@ -50,7 +64,7 @@ var songDetail = {
     },
 
     field(label, id, type) {
-        return '<div class="mb-2 row"><label class="col-sm-3 col-form-label col-form-label-sm">' + label + '</label>'
+        return '<div class="mb-2 row"><label for="' + id + '" class="col-sm-3 col-form-label col-form-label-sm">' + label + '</label>'
             + '<div class="col-sm-9"><input type="' + type + '" id="' + id + '" class="form-control form-control-sm" /></div></div>';
     },
 
@@ -72,6 +86,10 @@ var songDetail = {
         document.getElementById('sd_duration').textContent = dur;
         document.getElementById('sd_tagStatus').textContent = '';
         document.getElementById('sd_filterStatus').textContent = '';
+        document.getElementById('sd_artUrl').value = '';
+        document.getElementById('sd_artFile').value = '';
+        document.getElementById('sd_artStatus').textContent = '';
+        this.loadArtPreview(p.pieceId, p.album);
 
         var tbody = document.getElementById('sd_filterBody');
         tbody.innerHTML = '';
@@ -154,6 +172,61 @@ var songDetail = {
         setTimeout(function() { status.textContent = ''; }, 2000);
     },
 
+    async loadArtPreview(pieceId, album) {
+        var img = document.getElementById('sd_artPreview');
+        var none = document.getElementById('sd_artNone');
+        if (!img) return;
+        img.style.display = 'none'; none.style.display = '';
+        try {
+            var resp = await fetch('/Player/AlbumArt?id=' + pieceId + '&t=' + Date.now());
+            if (!resp.ok) return;
+            var ct = resp.headers.get('content-type') || '';
+            if (ct.indexOf('json') >= 0) {
+                var d = await resp.json();
+                img.src = d.url;
+                document.getElementById('sd_artUrl').value = (d.url || '').replace(/#artist$/, '');
+            } else {
+                img.src = '/Player/AlbumArt?id=' + pieceId + '&t=' + Date.now();
+            }
+            img.alt = album ? 'Current album art for ' + album : 'Current album art';
+            img.onerror = function() { img.style.display = 'none'; none.style.display = ''; };
+            img.style.display = ''; none.style.display = 'none';
+        } catch (e) { }
+    },
+    artDone(ok, msg) {
+        var status = document.getElementById('sd_artStatus');
+        status.textContent = msg;
+        status.className = 'small ' + (ok ? 'text-success' : 'text-danger');
+        if (!ok) return;
+        var pieceId = parseInt(document.getElementById('sd_pieceId').value);
+        this.loadArtPreview(pieceId, document.getElementById('sd_album').value);
+        if (typeof pigPlayer !== 'undefined' && pigPlayer._currentSong && pigPlayer._currentSong.pieceId === pieceId && pigPlayer.loadAlbumArt)
+            pigPlayer.loadAlbumArt(pieceId);
+    },
+    async saveArtUrl() {
+        var pieceId = parseInt(document.getElementById('sd_pieceId').value);
+        var url = document.getElementById('sd_artUrl').value.trim();
+        if (!/^https:\/\/\S+$/i.test(url)) { this.artDone(false, 'Enter an https:// image URL'); return; }
+        var resp = await fetch('/Songs/SaveArtUrl', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ PieceId: pieceId, Url: url })
+        });
+        this.artDone(resp.ok, resp.ok ? 'Album art saved' : 'Could not save that URL');
+    },
+    async uploadArt() {
+        var pieceId = parseInt(document.getElementById('sd_pieceId').value);
+        var input = document.getElementById('sd_artFile');
+        if (!input.files || !input.files[0]) { this.artDone(false, 'Choose an image first'); return; }
+        var fd = new FormData();
+        fd.append('pieceId', pieceId);
+        fd.append('file', input.files[0]);
+        var resp = await fetch('/Songs/UploadArt', { method: 'POST', body: fd });
+        var msg = 'Album art saved into the MP3';
+        if (!resp.ok) { try { msg = (await resp.json()).error || 'Upload failed'; } catch (e) { msg = 'Upload failed'; } }
+        if (resp.ok) input.value = '';
+        this.artDone(resp.ok, msg);
+    },
     esc(val) {
         if (!val) return '';
         return val.toString().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');

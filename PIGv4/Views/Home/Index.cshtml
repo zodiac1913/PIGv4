@@ -4,16 +4,27 @@
 
 <!-- Row 1: PIG logo + welcome -->
 <div class="home-hero d-flex flex-wrap align-items-center mt-3">
+    <h1 class="visually-hidden">PIG v4 Playlist Intelligent Generator</h1>
     <img id="pigLogo" src="~/pics/pig.png" alt="PIG Rock and Roll" class="pig-logo" />
     <div class="text-center ms-3 mt-2 d-none d-md-block">
         <p class="text-muted mb-0">Playlist<br /> Intelligent<br /> Generator<br /> v4.0</p>
     </div>
     <!-- Album art (appears when playing) -->
     <div class="ms-auto me-2 text-center d-none d-md-block">
-        <img id="homeAlbumArt" src="" alt="" class="home-album-art" style="display:none;" onclick="pigPlayer.showFullArt()" />
+        <div id="homeArtSearching" class="home-art-searching" style="display:none;" title="Looking for album art">
+            <span class="spinner-border" style="color:#D4117A;" role="status">
+                <span class="visually-hidden">Looking for album art</span>
+            </span>
+        </div>
+        <button type="button" id="homeAlbumArtBtn" class="home-album-art-btn" style="display:none;" onclick="pigPlayer.showFullArt()" aria-label="Show full size album art">
+            <img id="homeAlbumArt" src="" alt="Album art" class="home-album-art" style="display:none;" />
+        </button>
         <div class="mt-1">
-            <button class="btn btn-sm btn-outline-secondary py-0 px-1" id="homeEditBtn" onclick="pigPlayer.editCurrentSong()" title="Edit song tags" style="display:none;">
-                <i class="bi bi-pencil"></i>
+            <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-1" id="homeEditBtn" onclick="pigPlayer.editCurrentSong()" title="Edit song tags and album art" aria-label="Edit song tags and album art" style="display:none;">
+                <i class="bi bi-pencil" aria-hidden="true"></i>
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-danger py-0 px-1" id="homeArtTrashBtn" onclick="pigPlayer.rejectAlbumArt()" title="Wrong art? Remove it and look for another" aria-label="Remove wrong album art and look for another" style="display:none;">
+                <i class="bi bi-trash" aria-hidden="true"></i>
             </button>
         </div>
     </div>
@@ -48,7 +59,7 @@
     <div class="accordion w-100" id="musicSelectAccordion">
         <div class="accordion-item" style="border-color: Maroon;">
             <h2 class="accordion-header">
-                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#musicSelectBody" style="background-color: Maroon; color: HotPink;">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#musicSelectBody" style="background-color: Maroon; color: #FFC0CB;">
                     <i class="bi bi-sliders me-2"></i> Select Music
                 </button>
             </h2>
@@ -127,7 +138,7 @@
         <button class="btn btn-outline-dark player-btn me-1" id="homeWakeLockBtn" onclick="pigPlayer.toggleWakeLock()" title="Keep screen on"><i class="bi bi-phone"></i></button>
     </div>
     <div class="flex-grow-1 mx-2 player-seek" style="min-width:120px;">
-        <input type="range" id="homeSeekBar" class="form-range" min="0" max="100" value="0" step="0.1" oninput="pigPlayer.seek(this.value)" />
+        <input type="range" id="homeSeekBar" class="form-range" aria-label="Seek" min="0" max="100" value="0" step="0.1" oninput="pigPlayer.seek(this.value)" />
         <div class="d-flex justify-content-between" style="font-size:0.7rem; margin-top:-8px;">
             <span id="homeTimeElapsed">0:00</span>
             <span id="homeTimeDuration">0:00</span>
@@ -135,7 +146,7 @@
     </div>
     <div class="d-flex align-items-center player-volume" style="min-width:100px;">
         <i class="bi bi-volume-down me-1"></i>
-        <input type="range" id="homeVolume" class="form-range" min="0" max="100" value="100" step="1" oninput="pigPlayer.setVolume(this.value)" style="width:80px;" />
+        <input type="range" id="homeVolume" class="form-range" aria-label="Volume" min="0" max="100" value="100" step="1" oninput="pigPlayer.setVolume(this.value)" style="width:80px;" />
         <i class="bi bi-volume-up ms-1"></i>
     </div>
 </div>
@@ -143,6 +154,6 @@
 <div class="home-now-playing d-flex flex-wrap gap-2 mt-2 px-1" style="font-size:1.7rem;">
     <div>
         <span class="info-label">Gen Playlists:</span>
-        <span id="homePlaylists" style="color:HotPink;">—</span>
+        <span id="homePlaylists" style="color:#D4117A;">—</span>
     </div>
 </div>

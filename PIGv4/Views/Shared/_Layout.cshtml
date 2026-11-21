@@ -92,7 +92,7 @@
     @await RenderSectionAsync("Scripts", required: false)
 
 <!-- Album Art Lightbox -->
-<div id="artLightbox" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:9999; cursor:pointer; justify-content:center; align-items:center;" onclick="this.style.display='none'">
+<div id="artLightbox" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:9999; cursor:pointer; justify-content:center; align-items:center;" role="dialog" aria-modal="true" aria-label="Album art, press Escape or click to close" tabindex="-1" onclick="pigPlayer.closeFullArt()" onkeydown="if(event.key==='Escape'){pigPlayer.closeFullArt();}">
     <img id="artLightboxImg" src="" alt="Album Art" style="max-width:90vw; max-height:90vh; border-radius:8px; box-shadow:0 0 30px rgba(255,105,180,0.5);" />
 </div>
 

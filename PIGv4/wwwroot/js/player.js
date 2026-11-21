@@ -20,10 +20,8 @@ var pigPlayer = {
         this.audio.addEventListener('ended', () => this.next());
         this.audio.addEventListener('play', () => this.updateButtons(true));
         this.audio.addEventListener('pause', () => this.updateButtons(false));
-        this.audio.addEventListener('error', () => {
-            var el = document.getElementById('homeTitle');
-            if (el) el.textContent = 'Error loading audio';
-        });
+        this.audio.addEventListener('error', () => this.handleAudioError());
+        this.audio.addEventListener('playing', () => { this._audioRetries = 0; });
         this.loadFilters();
         this.setupMediaSession();
 
@@ -250,6 +248,12 @@ var pigPlayer = {
     // ── Playback ─────────────────────────────────────────────────────
     playSong(song) {
         this._currentSong = song;
+        this._audioRetries = 0;
+        var editBtn = document.getElementById('homeEditBtn');
+        if (editBtn) editBtn.style.display = 'inline-block';
+        clearTimeout(this._artPollTimer);
+        this.setHomeArtVisible(false);
+        this.setArtSearching(false);
 
         // Show loading state in home info
         this.setHomeInfo('homeTitle', 'Loading...');
@@ -288,25 +292,8 @@ var pigPlayer = {
                 this.setHomeInfo('homePlaylists', plText);
 
                 // Album art for home page
-                var artImg = document.getElementById('homeAlbumArt');
-                if (artImg) {
-                    try {
-                        var artResp = await fetch('/Player/AlbumArt?id=' + pieceId);
-                        if (artResp.ok) {
-                            var contentType = artResp.headers.get('content-type') || '';
-                            if (contentType.indexOf('json') >= 0) {
-                                var artData = await artResp.json();
-                                artImg.src = artData.url;
-                            } else {
-                                artImg.src = '/Player/AlbumArt?id=' + pieceId;
-                            }
-                            artImg.style.display = 'block';
-                            artImg.onerror = function() { this.style.display = 'none'; };
-                        } else {
-                            artImg.style.display = 'none';
-                        }
-                    } catch(e) { artImg.style.display = 'none'; }
-                }
+                this._artSong = { pieceId: pieceId, album: data.song.album, artist: data.song.artist };
+                await this.loadAlbumArt(pieceId);
 
                 // Update MediaSession with full info
                 if (this._currentSong) {
@@ -442,7 +429,10 @@ var pigPlayer = {
         var seekBar = document.getElementById('homeSeekBar');
         var elapsed = document.getElementById('homeTimeElapsed');
         var duration = document.getElementById('homeTimeDuration');
-        if (seekBar) seekBar.value = pct;
+        if (seekBar) {
+            seekBar.value = pct;
+            seekBar.setAttribute('aria-valuetext', this.formatTime(this.audio.currentTime) + ' of ' + this.formatTime(this.audio.duration));
+        }
         if (elapsed) elapsed.textContent = this.formatTime(this.audio.currentTime);
         if (duration) duration.textContent = this.formatTime(this.audio.duration);
     },
@@ -604,12 +594,130 @@ var pigPlayer = {
     },
 
     // ── Song Edit ────────────────────────────────────────────────────
+    async handleAudioError() {
+        var err = this.audio.error;
+        var song = this._currentSong;
+        if (!err || !song) return;
+        var names = { 1: 'aborted', 2: 'network error', 3: 'decode error', 4: 'source not supported' };
+        console.warn('Audio error for pieceId ' + song.pieceId + ': code ' + err.code + ' (' + (names[err.code] || '?') + ') ' + (err.message || ''));
+        // Find out what the server actually returned
+        var status = 0, type = '', loggedOut = false;
+        try {
+            var r = await fetch('/Player/Stream?id=' + song.pieceId, { headers: { Range: 'bytes=0-1' }, redirect: 'manual' });
+            status = r.status; type = r.headers.get('content-type') || '';
+            loggedOut = r.type === 'opaqueredirect' || status === 401 || type.indexOf('text/html') >= 0;
+        } catch (e) { /* network down: status stays 0, retry below */ }
+        if (this._currentSong !== song) return;
+        var el = document.getElementById('homeTitle');
+        if (loggedOut) {
+            if (el) el.textContent = 'Session expired - please log in again';
+            return;
+        }
+        if (status === 404) {
+            if (el) el.textContent = 'Error loading audio: song has no audio data';
+            return;
+        }
+        // Network or transient errors: retry from where we were, up to 2 times
+        this._audioRetries = (this._audioRetries || 0) + 1;
+        if (this._audioRetries <= 2) {
+            var at = this.audio.currentTime || 0;
+            if (el) el.textContent = 'Reconnecting...';
+            setTimeout(() => {
+                if (this._currentSong !== song) return;
+                this.audio.src = '/Player/Stream?id=' + song.pieceId + '&retry=' + this._audioRetries;
+                this.audio.addEventListener('loadedmetadata', () => {
+                    if (at > 0) this.audio.currentTime = at;
+                    this.setHomeInfo('homeTitle', song.title || 'Unknown');
+                    this.audio.play().catch(() => {});
+                }, { once: true });
+                this.audio.load();
+            }, 1000 * this._audioRetries);
+            return;
+        }
+        if (el) el.textContent = 'Error loading audio (' + (names[err.code] || 'code ' + err.code) + ', server ' + status + ')';
+    },
+    async loadAlbumArt(pieceId, poll) {
+        var artImg = document.getElementById('homeAlbumArt');
+        if (!artImg) return;
+        var info = (this._artSong && this._artSong.pieceId === pieceId) ? this._artSong : {};
+        if (!poll) clearTimeout(this._artPollTimer);
+        try {
+            var artResp = await fetch('/Player/AlbumArt?id=' + pieceId + (poll ? '&poll=true' : '') + '&t=' + Date.now());
+            // A newer song started while we waited
+            if (!this._currentSong || this._currentSong.pieceId !== pieceId) return;
+            if (!artResp.ok) {
+                this.setHomeArtVisible(false);
+                var searching = false;
+                try { searching = !!(await artResp.json()).searching; } catch (e) { }
+                this.setArtSearching(searching);
+                if (searching) this.pollAlbumArt(pieceId);
+                return;
+            }
+            this.setArtSearching(false);
+            var online = false, artistPhoto = false;
+            var contentType = artResp.headers.get('content-type') || '';
+            if (contentType.indexOf('json') >= 0) {
+                var artData = await artResp.json();
+                artImg.src = artData.url;
+                online = true;
+                artistPhoto = !!artData.isArtistPhoto;
+            } else {
+                artImg.src = '/Player/AlbumArt?id=' + pieceId + '&t=' + Date.now();
+            }
+            if (artistPhoto) artImg.alt = info.artist ? 'Photo of ' + info.artist : 'Artist photo';
+            else artImg.alt = info.album ? 'Album art for ' + info.album : 'Album art';
+            var artBtn = document.getElementById('homeAlbumArtBtn');
+            if (artBtn) artBtn.setAttribute('aria-label', 'Show full size ' + artImg.alt.charAt(0).toLowerCase() + artImg.alt.slice(1));
+            this.setHomeArtVisible(true, online);
+            artImg.onerror = () => { this.setHomeArtVisible(false); };
+        } catch(e) { this.setHomeArtVisible(false); this.setArtSearching(false); }
+    },
+    pollAlbumArt(pieceId) {
+        clearTimeout(this._artPollTimer);
+        this._artPollTimer = setTimeout(() => {
+            if (this._currentSong && this._currentSong.pieceId === pieceId) this.loadAlbumArt(pieceId, true);
+            else this.setArtSearching(false);
+        }, 3000);
+    },
+    setArtSearching(on) {
+        var el = document.getElementById('homeArtSearching');
+        if (el) el.style.display = on ? 'flex' : 'none';
+    },
+    async rejectAlbumArt() {
+        var pieceId = this._currentSong && this._currentSong.pieceId;
+        if (!pieceId) return;
+        this.setHomeArtVisible(false);
+        this.setArtSearching(true);
+        try { await fetch('/Player/RejectAlbumArt?id=' + pieceId, { method: 'POST' }); }
+        catch(e) { this.setArtSearching(false); return; }
+        // Spinner stays up while the server looks for a replacement
+        this.pollAlbumArt(pieceId);
+    },
+    setHomeArtVisible(visible, online) {
+        var artImg = document.getElementById('homeAlbumArt');
+        var artBtn = document.getElementById('homeAlbumArtBtn');
+        var trashBtn = document.getElementById('homeArtTrashBtn');
+        if (artImg) artImg.style.display = visible ? 'block' : 'none';
+        if (artBtn) artBtn.style.display = visible ? 'inline-block' : 'none';
+        // Trash only for art found online; art embedded in the MP3 is changed in the editor
+        if (trashBtn) trashBtn.style.display = (visible && online) ? 'inline-block' : 'none';
+    },
     showFullArt() {
         var thumb = document.getElementById('homeAlbumArt');
         if (!thumb || !thumb.src || thumb.style.display === 'none') return;
         var lb = document.getElementById('artLightbox');
-        document.getElementById('artLightboxImg').src = thumb.src;
+        var lbImg = document.getElementById('artLightboxImg');
+        lbImg.src = thumb.src;
+        lbImg.alt = thumb.alt || 'Album art';
         lb.style.display = 'flex';
+        lb.focus();
+    },
+    closeFullArt() {
+        var lb = document.getElementById('artLightbox');
+        if (!lb || lb.style.display === 'none') return;
+        lb.style.display = 'none';
+        var artBtn = document.getElementById('homeAlbumArtBtn');
+        if (artBtn && artBtn.style.display !== 'none') artBtn.focus();
     },
 
     clearQueue() {

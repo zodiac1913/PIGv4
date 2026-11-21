@@ -19,9 +19,14 @@ public class PlayerController : Controller
             .Select(p => new { p.Mp3 })
             .FirstOrDefaultAsync();
 
-        if (piece?.Mp3 == null) return NotFound();
+        if (piece?.Mp3 == null)
+        {
+            Console.WriteLine($"Stream: no MP3 data for PieceId {id}");
+            return NotFound();
+        }
 
-        return File(piece.Mp3, "audio/mpeg");
+        // Range support lets browsers seek and resume after a dropped connection (Safari/iOS require it)
+        return File(piece.Mp3, "audio/mpeg", enableRangeProcessing: true);
     }
 
     /// <summary>Browse songs with optional filters. Returns lightweight JSON (no blob).</summary>
@@ -144,35 +149,31 @@ public class PlayerController : Controller
         return Json(new { song, playlists = playlistNames });
     }
 
-    /// <summary>Get album art: embedded in MP3, or return cached URL for external art.</summary>
+    /// <summary>
+    /// Get album art: embedded in MP3, or the cached online URL.
+    /// When there is none, a background lookup runs on every play until art is found.
+    /// </summary>
     [HttpGet]
-    public async Task<IActionResult> AlbumArt(int id)
+    /// <param name="poll">True when the page is only checking on a running lookup; does not start a new one.</param>
+    public async Task<IActionResult> AlbumArt(int id, bool poll = false)
     {
         var piece = await _context.Piece
             .Where(p => p.PieceId == id)
-            .Select(p => new { p.PieceId, p.Mp3, p.AlbumArtUrl, p.AlbumArtChecked, p.Artist, p.Album })
+            .Select(p => new { p.PieceId, p.Mp3, p.AlbumArtUrl, p.Artist, p.Album, p.Year })
             .FirstOrDefaultAsync();
-
         if (piece == null) return NotFound();
-
-        // 1. If we have a cached URL, return it as JSON
+        // 1. Cached online art (only ever saved for songs without embedded art)
         if (!string.IsNullOrEmpty(piece.AlbumArtUrl))
-            return Json(new { url = piece.AlbumArtUrl });
-
-        // 2. Already checked and nothing found
-        if (piece.AlbumArtChecked)
-            return NotFound();
-
-        // 3. Try embedded art in MP3
+            return Json(new { url = piece.AlbumArtUrl,
+                              isArtistPhoto = piece.AlbumArtUrl.EndsWith(AlbumArtLookup.ArtistPhotoMarker) });
+        // 2. Embedded art in the MP3
         if (piece.Mp3 != null)
         {
+            var tempPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}.mp3");
             try
             {
-                var tempPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}.mp3");
                 await System.IO.File.WriteAllBytesAsync(tempPath, piece.Mp3);
                 using var tagFile = TagLib.File.Create(tempPath);
-                System.IO.File.Delete(tempPath);
-
                 if (tagFile.Tag.Pictures.Length > 0)
                 {
                     var pic = tagFile.Tag.Pictures[0];
@@ -180,103 +181,56 @@ public class PlayerController : Controller
                 }
             }
             catch { }
+            finally { try { System.IO.File.Delete(tempPath); } catch { } }
         }
-
-        // 4. Fire background lookup for URL (Cover Art Archive → Wikipedia)
-        _ = Task.Run(async () => await FetchAndCacheArtUrl(piece.PieceId, piece.Artist, piece.Album));
-
-        // Mark as checked
-        var p2 = await _context.Piece.FindAsync(piece.PieceId);
-        if (p2 != null)
+        // 3. Nothing yet: look it up in the background (retried on every play)
+        if (!poll) StartArtLookup(piece.PieceId, piece.Artist, piece.Album, piece.Year);
+        return NotFound(new { searching = AlbumArtLookup.IsRunning(piece.PieceId) });
+    }
+    /// <summary>Reject the current online album art and look for a different one.</summary>
+    [HttpPost]
+    public async Task<IActionResult> RejectAlbumArt(int id)
+    {
+        var piece = await _context.Piece.FindAsync(id);
+        if (piece == null) return NotFound();
+        if (!string.IsNullOrEmpty(piece.AlbumArtUrl))
         {
-            p2.AlbumArtChecked = true;
+            await _context.Database.ExecuteSqlInterpolatedAsync(
+                $"INSERT OR IGNORE INTO AlbumArtRejected (PieceId, Url) VALUES ({id}, {piece.AlbumArtUrl})");
+            piece.AlbumArtUrl = null;
+            piece.AlbumArtChecked = false;
             await _context.SaveChangesAsync();
+            await PlaylistResolver.UpdateLookup(_context, piece);
         }
-
-        return NotFound();
+        StartArtLookup(piece.PieceId, piece.Artist, piece.Album, piece.Year);
+        return Ok(new { searching = AlbumArtLookup.IsRunning(piece.PieceId) });
     }
-
-    private static readonly HttpClient _artClient = new()
+    private void StartArtLookup(int pieceId, string? artist, string? album, int? year)
     {
-        DefaultRequestHeaders = { { "User-Agent", "PIGv4/1.0 (playlist-intelligent-generator)" } }
-    };
-
-    private async Task FetchAndCacheArtUrl(int pieceId, string? artist, string? album)
-    {
-        if (string.IsNullOrEmpty(artist)) return;
-        string? artUrl = null;
-
-        // Step 1: Try Cover Art Archive
-        if (!string.IsNullOrEmpty(album))
+        if (!AlbumArtLookup.TryBegin(pieceId)) return;
+        var scopeFactory = HttpContext.RequestServices.GetRequiredService<IServiceScopeFactory>();
+        _ = Task.Run(async () =>
         {
             try
             {
-                var searchUrl = $"https://musicbrainz.org/ws/2/release/?query=artist:{Uri.EscapeDataString(artist)}+release:{Uri.EscapeDataString(album)}&fmt=json&limit=1";
-                var searchJson = await _artClient.GetStringAsync(searchUrl);
-                using var doc = System.Text.Json.JsonDocument.Parse(searchJson);
-                var releases = doc.RootElement.GetProperty("releases");
-                if (releases.GetArrayLength() > 0)
-                {
-                    var releaseId = releases[0].GetProperty("id").GetString();
-                    if (!string.IsNullOrEmpty(releaseId))
-                        artUrl = $"https://coverartarchive.org/release/{releaseId}/front-250";
-                }
-            }
-            catch { }
-        }
-
-        // Step 2: Try Wikipedia artist image
-        if (string.IsNullOrEmpty(artUrl))
-        {
-            try
-            {
-                await Task.Delay(500);
-                var wikiUrl = $"https://en.wikipedia.org/wiki/{Uri.EscapeDataString(artist.Replace(" ", "_"))}";
-                var html = await _artClient.GetStringAsync(wikiUrl);
-
-                var marker = "infobox-image";
-                var idx = html.IndexOf(marker);
-                if (idx > 0)
-                {
-                    var imgStart = html.IndexOf("<img", idx);
-                    if (imgStart > 0 && imgStart < idx + 2000)
-                    {
-                        var srcStart = html.IndexOf("src=\"", imgStart);
-                        if (srcStart > 0)
-                        {
-                            srcStart += 5;
-                            var srcEnd = html.IndexOf("\"", srcStart);
-                            var imgSrc = html.Substring(srcStart, srcEnd - srcStart);
-                            if (imgSrc.StartsWith("//")) imgSrc = "https:" + imgSrc;
-                            artUrl = imgSrc;
-                        }
-                    }
-                }
-            }
-            catch { }
-        }
-
-        // Save URL if found
-        if (!string.IsNullOrEmpty(artUrl))
-        {
-            try
-            {
-                var connStr = _context.Database.GetConnectionString();
-                var opts = new Microsoft.EntityFrameworkCore.DbContextOptionsBuilder<PigContext>()
-                    .UseSqlite(connStr).Options;
-                using var db = new PigContext(opts);
+                using var scope = scopeFactory.CreateScope();
+                var db = scope.ServiceProvider.GetRequiredService<PigContext>();
+                var rejected = (await db.Database
+                    .SqlQuery<string>($"SELECT Url AS Value FROM AlbumArtRejected WHERE PieceId = {pieceId}")
+                    .ToListAsync()).ToHashSet();
+                var artUrl = await AlbumArtLookup.FindAsync(artist, album, year, rejected);
+                if (string.IsNullOrEmpty(artUrl)) return;
                 var entity = await db.Piece.FindAsync(pieceId);
-                if (entity != null)
-                {
-                    entity.AlbumArtUrl = artUrl;
-                    entity.AlbumArtChecked = true;
-                    await db.SaveChangesAsync();
-                }
+                if (entity == null) return;
+                entity.AlbumArtUrl = artUrl;
+                entity.AlbumArtChecked = true;
+                await db.SaveChangesAsync();
+                await PlaylistResolver.UpdateLookup(db, entity);
             }
-            catch { }
-        }
+            catch (Exception ex) { Console.WriteLine($"Album art lookup failed for {pieceId}: {ex.Message}"); }
+            finally { AlbumArtLookup.End(pieceId); }
+        });
     }
-
     /// <summary>Get distinct filter values. Pass type=folders, genres, or artists.</summary>
     [HttpGet]
     public async Task<IActionResult> Filters(string? type)

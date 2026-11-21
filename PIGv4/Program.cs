@@ -43,6 +43,14 @@ using (var scope = app.Services.CreateScope())
     if (dbDir != null) Directory.CreateDirectory(dbDir);
     
     db.Database.EnsureCreated();
+    // WAL lets readers (audio streams) keep going while something writes. Persistent; safe to run every start.
+    // Revert with PRAGMA journal_mode=DELETE; if ever needed.
+    try
+    {
+        var mode = db.Database.SqlQueryRaw<string>("PRAGMA journal_mode=WAL;").AsEnumerable().FirstOrDefault();
+        Console.WriteLine($"SQLite journal mode: {mode}");
+    }
+    catch (Exception ex) { Console.WriteLine("Could not enable WAL: " + ex.Message); }
     
     // Create view and indexes if they don't exist (wrapped in try-catch for existing DBs)
     try { db.Database.ExecuteSqlRaw(@"
@@ -69,7 +77,9 @@ using (var scope = app.Services.CreateScope())
         "CREATE INDEX IF NOT EXISTS IX_Piece_AudioHash_Artist ON Piece(AudioHash, Artist);",
         // ApiToken table
         "CREATE TABLE IF NOT EXISTS ApiToken (ApiTokenId INTEGER PRIMARY KEY AUTOINCREMENT, AppUserId INTEGER NOT NULL, Token TEXT NOT NULL, DeviceName TEXT, Created TEXT NOT NULL DEFAULT (datetime('now')), LastUsed TEXT, IsActive INTEGER NOT NULL DEFAULT 1);",
-        "CREATE UNIQUE INDEX IF NOT EXISTS IX_ApiToken_Token ON ApiToken(Token);"
+        "CREATE UNIQUE INDEX IF NOT EXISTS IX_ApiToken_Token ON ApiToken(Token);",
+        // Album art the user rejected with the trash button (never offered again for that song)
+        "CREATE TABLE IF NOT EXISTS AlbumArtRejected (PieceId INTEGER NOT NULL, Url TEXT NOT NULL, Rejected TEXT NOT NULL DEFAULT (datetime('now')), PRIMARY KEY (PieceId, Url));"
     };
     foreach (var sql in indexes)
     {

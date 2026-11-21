@@ -154,6 +154,76 @@ public class SongsController : Controller
         }
     }
 
+    /// <summary>Use an online image URL as this song's album art (shown instead of any embedded art).</summary>
+    [HttpPost]
+    public async Task<IActionResult> SaveArtUrl([FromBody] SaveArtUrlRequest req)
+    {
+        var url = req.Url?.Trim();
+        if (string.IsNullOrEmpty(url) || url.Length > 500
+            || !Uri.TryCreate(url, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps)
+            return BadRequest(new { error = "Enter an https:// image URL (500 characters max)." });
+        var piece = await _context.Piece.FindAsync(req.PieceId);
+        if (piece == null) return NotFound();
+        piece.AlbumArtUrl = url;
+        piece.AlbumArtChecked = true;
+        piece.Editor = "Songs";
+        piece.Edited = DateTime.Now;
+        await _context.SaveChangesAsync();
+        await PlaylistResolver.UpdateLookup(_context, piece);
+        return Json(new { success = true });
+    }
+    /// <summary>Upload an image and embed it in the MP3 as the front cover. Clears any online art URL.</summary>
+    [HttpPost]
+    [RequestSizeLimit(6 * 1024 * 1024)]
+    public async Task<IActionResult> UploadArt([FromForm] int pieceId, IFormFile? file)
+    {
+        if (file == null || file.Length == 0) return BadRequest(new { error = "Choose an image first." });
+        if (file.Length > 5 * 1024 * 1024) return BadRequest(new { error = "Image must be 5 MB or smaller." });
+        using var ms = new MemoryStream();
+        await file.CopyToAsync(ms);
+        var bytes = ms.ToArray();
+        // Trust the file's bytes, not its name or content type
+        string? mime = null;
+        if (bytes.Length > 3 && bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF) mime = "image/jpeg";
+        else if (bytes.Length > 8 && bytes[0] == 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E && bytes[3] == 0x47) mime = "image/png";
+        if (mime == null) return BadRequest(new { error = "Only JPEG or PNG images are supported." });
+        var piece = await _context.Piece.FindAsync(pieceId);
+        if (piece == null) return NotFound();
+        if (piece.Mp3 == null) return BadRequest(new { error = "This song has no MP3 data." });
+        var tempPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".mp3");
+        try
+        {
+            await System.IO.File.WriteAllBytesAsync(tempPath, piece.Mp3);
+            using (var tagFile = TagLib.File.Create(tempPath))
+            {
+                tagFile.Tag.Pictures = new TagLib.IPicture[]
+                {
+                    new TagLib.Picture(new TagLib.ByteVector(bytes))
+                    {
+                        Type = TagLib.PictureType.FrontCover,
+                        MimeType = mime,
+                        Description = "Front cover"
+                    }
+                };
+                tagFile.Save();
+            }
+            piece.Mp3 = await System.IO.File.ReadAllBytesAsync(tempPath);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"UploadArt failed for PieceId {pieceId}: {ex.Message}");
+            return StatusCode(500, new { error = "Could not write the image into the MP3." });
+        }
+        finally { try { System.IO.File.Delete(tempPath); } catch { } }
+        piece.FileSize = piece.Mp3.Length;
+        piece.AlbumArtUrl = null;
+        piece.AlbumArtChecked = true;
+        piece.Editor = "Songs";
+        piece.Edited = DateTime.Now;
+        await _context.SaveChangesAsync();
+        await PlaylistResolver.UpdateLookup(_context, piece);
+        return Json(new { success = true });
+    }
     /// <summary>Save playlist filter assignments for a song and mark it as not new.</summary>
     [HttpPost]
     public async Task<IActionResult> SaveFilters([FromBody] SaveFiltersRequest req)
@@ -273,4 +343,9 @@ public class FilterAssignment
 public class DeleteRequest
 {
     public int PieceId { get; set; }
+}
+public class SaveArtUrlRequest
+{
+    public int PieceId { get; set; }
+    public string? Url { get; set; }
 }
