@@ -246,6 +246,18 @@ var pigPlayer = {
     },
 
     // ── Playback ─────────────────────────────────────────────────────
+    // Samsung TV browser (Tizen): its media player sends no cookie, so it uses signed stream URLs.
+    _isSamsungTv: /Tizen|SMART-TV/i.test(navigator.userAgent),
+    async setTvStreamSrc(song, extra) {
+        var url = '/Player/Stream?id=' + song.pieceId;
+        try {
+            var r = await fetch('/Player/StreamUrl?id=' + song.pieceId);
+            if (r.ok) url = (await r.json()).url;
+        } catch (e) { }
+        if (this._currentSong !== song) return;
+        this.audio.src = url + (extra || '');
+        this.audio.load();
+    },
     playSong(song) {
         this._currentSong = song;
         this._audioRetries = 0;
@@ -263,7 +275,7 @@ var pigPlayer = {
         this.setHomeInfo('homeYear', '');
         this.setHomeInfo('homePlaylists', '');
 
-        this.audio.src = '/Player/Stream?id=' + song.pieceId;
+        if (!this._isSamsungTv) this.audio.src = '/Player/Stream?id=' + song.pieceId;
         var self = this;
         var onReady = function () {
             self.audio.removeEventListener('canplay', onReady);
@@ -275,7 +287,8 @@ var pigPlayer = {
             self.updateMediaSession(song);
         };
         this.audio.addEventListener('canplay', onReady);
-        this.audio.load();
+        if (this._isSamsungTv) this.setTvStreamSrc(song);
+        else this.audio.load();
 
         // Acquire wake lock if enabled
         if (this._wakeLockEnabled) this.acquireWakeLock();
@@ -624,13 +637,14 @@ var pigPlayer = {
             if (el) el.textContent = 'Reconnecting...';
             setTimeout(() => {
                 if (this._currentSong !== song) return;
-                this.audio.src = '/Player/Stream?id=' + song.pieceId + '&retry=' + this._audioRetries;
+                if (!this._isSamsungTv) this.audio.src = '/Player/Stream?id=' + song.pieceId + '&retry=' + this._audioRetries;
                 this.audio.addEventListener('loadedmetadata', () => {
                     if (at > 0) this.audio.currentTime = at;
                     this.setHomeInfo('homeTitle', song.title || 'Unknown');
                     this.audio.play().catch(() => {});
                 }, { once: true });
-                this.audio.load();
+                if (this._isSamsungTv) this.setTvStreamSrc(song, '&retry=' + this._audioRetries);
+                else this.audio.load();
             }, 1000 * this._audioRetries);
             return;
         }

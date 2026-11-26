@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PIGv4.Models;
@@ -10,10 +12,42 @@ public class PlayerController : Controller
 
     public PlayerController(PigContext context) => _context = context;
 
-    /// <summary>Stream MP3 audio for a given PieceId.</summary>
+    // ── Samsung TV (Tizen) support ──────────────────────────────────
+    // The Tizen media player fetches audio without the login cookie, so it gets a signed,
+    // song-specific ticket in the URL instead. Only the TV page asks for one; every other
+    // browser keeps using the cookie exactly as before.
+    private static readonly TimeSpan StreamTicketLifetime = TimeSpan.FromHours(6);
+    private ITimeLimitedDataProtector StreamTicketProtector() =>
+        HttpContext.RequestServices.GetRequiredService<IDataProtectionProvider>()
+            .CreateProtector("PIGv4.StreamTicket").ToTimeLimitedDataProtector();
+    /// <summary>Signed stream URL for one song (Samsung TV only). Valid 6 hours, this song only.</summary>
     [HttpGet]
-    public async Task<IActionResult> Stream(int id)
+    public IActionResult StreamUrl(int id)
     {
+        var ticket = StreamTicketProtector().Protect($"{id}|{User.Identity?.Name}", StreamTicketLifetime);
+        return Json(new { url = $"/Player/Stream?id={id}&st={Uri.EscapeDataString(ticket)}" });
+    }
+    private async Task<bool> IsValidStreamTicket(int id, string? st)
+    {
+        if (string.IsNullOrEmpty(st)) return false;
+        string payload;
+        try { payload = StreamTicketProtector().Unprotect(st, out _); }
+        catch { return false; } // tampered, expired, or unknown key
+        var parts = payload.Split('|', 2);
+        if (parts.Length != 2 || parts[0] != id.ToString()) return false;
+        var username = parts[1];
+        return await _context.AppUser.AnyAsync(u => u.Username == username && u.IsActive && u.IsApproved);
+    }
+    /// <summary>Stream MP3 audio for a given PieceId. Login cookie, or a Samsung TV stream ticket.</summary>
+    [HttpGet]
+    [AllowAnonymous]
+    public async Task<IActionResult> Stream(int id, string? st)
+    {
+        if (User.Identity?.IsAuthenticated != true)
+        {
+            if (!await IsValidStreamTicket(id, st))
+                return Redirect("/Account/Login?ReturnUrl=" + Uri.EscapeDataString(Request.Path + Request.QueryString));
+        }
         var piece = await _context.Piece
             .Where(p => p.PieceId == id)
             .Select(p => new { p.Mp3 })
